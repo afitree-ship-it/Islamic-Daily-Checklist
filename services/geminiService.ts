@@ -2,17 +2,17 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { DailyReflection } from "../types";
 
+const FALLBACK_REFLECTION: DailyReflection = {
+  quote: "แท้จริงหลังความยากลำบาก จะมีความง่ายดาย",
+  reference: "อัลกุรอาน 94:5",
+  message: "ขอให้ทุกคนรักษาความดีต่อไป อัลลอฮฺทรงเห็นในความพยายาม"
+};
+
 export async function getDailyMotivation(progressSummary: string): Promise<DailyReflection> {
-  // ตรวจสอบว่ามี API Key หรือไม่ ถ้าไม่มีให้ใช้ dummy เพื่อไม่ให้แอป crash
   const apiKey = process.env.API_KEY || "";
   
-  if (!apiKey) {
-    console.warn("API_KEY is not defined. AI features will be disabled.");
-    return {
-      quote: "การมีความอดทนคือส่วนหนึ่งของความศรัทธา",
-      reference: "คำสอนอิสลาม",
-      message: "กรุณาตั้งค่า API Key เพื่อรับข้อความแนะนำจาก AI"
-    };
+  if (!apiKey || apiKey.includes("กรุณาวาง")) {
+    return FALLBACK_REFLECTION;
   }
 
   const ai = new GoogleGenAI({ apiKey });
@@ -36,15 +36,10 @@ export async function getDailyMotivation(progressSummary: string): Promise<Daily
     });
 
     const text = response.text;
-    if (!text) throw new Error("No response from AI");
+    if (!text) return FALLBACK_REFLECTION;
     return JSON.parse(text.trim());
   } catch (error: any) {
     console.error("Gemini API Error:", error);
-    // Fallback เมื่อ AI มีปัญหา
-    return {
-      quote: "แท้จริงหลังความยากลำบาก จะมีความง่ายดาย",
-      reference: "อัลกุรอาน 94:5",
-      message: "ขอให้ทุกคนรักษาความดีต่อไป อัลลอฮฺทรงเห็นในความพยายาม"
-    };
+    return FALLBACK_REFLECTION;
   }
 }

@@ -23,30 +23,54 @@ const App: React.FC = () => {
   });
   
   const [reflection, setReflection] = useState<DailyReflection | null>(null);
-  const [apiError, setApiError] = useState<string | null>(null);
   const [showLeaderSummary, setShowLeaderSummary] = useState(false);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
-  // โหลดข้อมูลทั้งหมดจาก Google Sheets เมื่อเปิดแอป
-  const loadGlobalData = useCallback(async () => {
+  // ฟังก์ชันโหลดข้อมูลแบบผสาน (Merge)
+  const loadGlobalData = useCallback(async (isAutoRefresh = false) => {
+    // ถ้ากำลังบันทึกค่าใหม่ ให้ข้ามการดึงค่าจาก Sheet ชั่วคราวเพื่อป้องกันการเขียนทับ
+    if (isAutoRefresh && syncStatus === 'syncing') return;
+
     try {
-      const globalData = await fetchProgressFromSheets();
-      if (globalData) {
-        setProgress(globalData);
-        localStorage.setItem('deen_tracker_v1', JSON.stringify(globalData));
+      const remoteData = await fetchProgressFromSheets();
+      if (remoteData) {
+        setProgress(prev => {
+          // ใช้ข้อมูลใหม่จาก Remote เป็นฐาน
+          const merged = { ...remoteData };
+          
+          // ตรวจสอบข้อมูลในเครื่อง (Local) เพื่อป้องกันการติ๊กหาย
+          // วนลูปเฉพาะวันที่ปัจจุบันเพื่อความรวดเร็ว
+          if (prev[currentDate]) {
+            if (!merged[currentDate]) merged[currentDate] = {};
+            
+            Object.keys(prev[currentDate]).forEach(memberId => {
+              if (!merged[currentDate][memberId]) merged[currentDate][memberId] = {};
+              
+              // ผสานข้อมูลราย Task
+              Object.keys(prev[currentDate][memberId]).forEach(taskId => {
+                // ถ้าในเครื่องเป็น true แต่ Remote เป็น false (เพราะยัง Sync ไม่ถึง) ให้ยึดเครื่องไว้ก่อน
+                if (prev[currentDate][memberId][taskId] === true) {
+                  merged[currentDate][memberId][taskId] = true;
+                }
+              });
+            });
+          }
+          
+          localStorage.setItem('deen_tracker_v1', JSON.stringify(merged));
+          return merged;
+        });
       }
     } catch (err) {
       console.error("Fetch error:", err);
     } finally {
       setIsInitialLoading(false);
     }
-  }, []);
+  }, [syncStatus, currentDate]);
 
   useEffect(() => {
     loadGlobalData();
-    // ตั้งเวลาดึงข้อมูลใหม่ทุกๆ 30 วินาที เพื่อดูความคืบหน้าของเพื่อน
-    const interval = setInterval(loadGlobalData, 30000);
+    const interval = setInterval(() => loadGlobalData(true), 30000);
     return () => clearInterval(interval);
   }, [loadGlobalData]);
 
@@ -61,7 +85,7 @@ const App: React.FC = () => {
 
     let targetValue = false;
     
-    // 1. อัปเดต UI ทันที (Optimistic UI)
+    // 1. อัปเดต UI ทันที (Optimistic Update)
     setProgress(prev => {
       const currentStatus = !!(prev[date]?.[memberId]?.[taskId]);
       targetValue = !currentStatus;
@@ -80,7 +104,7 @@ const App: React.FC = () => {
       return updated;
     });
 
-    // 2. ส่งข้อมูลไปบันทึกที่ Google Sheets
+    // 2. ซิงค์กับระบบหลังบ้าน
     setSyncStatus('syncing');
     try {
       const success = await syncProgressToSheets(date, memberId, taskId, targetValue);
@@ -88,7 +112,6 @@ const App: React.FC = () => {
     } catch (error) {
       setSyncStatus('error');
     } finally {
-      // คืนสถานะกลับเป็น idle หลังผ่านไป 2 วินาที
       setTimeout(() => setSyncStatus('idle'), 2000);
     }
   }, [activeMember]);
@@ -100,27 +123,23 @@ const App: React.FC = () => {
       const mData = dayData[m.id] || {};
       total += Object.values(mData).filter(v => v).length;
     });
-    return `Score: ${total}/${MEMBERS.length * TASKS.length}. Most tasks: ${TASKS.find(t => t.id === 't1')?.label}`;
+    return `Score: ${total}/${MEMBERS.length * TASKS.length} for ${currentDate}`;
   }, [progress, currentDate]);
 
   useEffect(() => {
     const fetchReflection = async () => {
-      setApiError(null);
       try {
         const res = await getDailyMotivation(progressSummaryText);
         setReflection(res);
-        if (res.message.includes("ตั้งค่า API Key")) {
-          setApiError(res.message);
-        }
       } catch (e) {
-        setApiError("AI ยังไม่พร้อมทำงาน กรุณาเช็ค API Key");
+        // Fallback handled inside service
       }
     };
     fetchReflection();
   }, [currentDate, progressSummaryText]);
 
   return (
-    <div className="min-h-screen bg-[#fcfdfe] pb-20 selection:bg-emerald-100">
+    <div className="min-h-screen bg-[#fcfdfe] pb-20 selection:bg-emerald-100 font-['Anuphan']">
       {isInitialLoading && (
         <div className="fixed inset-0 z-[100] bg-emerald-900 flex flex-col items-center justify-center text-white">
           <div className="w-16 h-16 border-4 border-emerald-400 border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -159,7 +178,7 @@ const App: React.FC = () => {
                 {activeMember && (
                   <div className="flex items-center gap-2 text-emerald-100/80">
                     <span className="text-sm">ผู้ใช้งาน: <b>{activeMember.name}</b></span>
-                    <button onClick={() => setShowMemberSelector(true)} className="text-xs underline hover:text-white transition-colors">เปลี่ยนชื่อ</button>
+                    <button onClick={() => setShowMemberSelector(true)} className="text-xs underline hover:text-white transition-colors">เปลี่ยนคน</button>
                   </div>
                 )}
             </div>
@@ -168,20 +187,20 @@ const App: React.FC = () => {
           <div className="flex items-center gap-4">
             <div className="flex flex-col items-end mr-2 text-right">
               <span className={`text-[10px] font-bold uppercase tracking-widest ${
-                syncStatus === 'syncing' ? 'text-amber-400' : 
+                syncStatus === 'syncing' ? 'text-amber-400 animate-pulse' : 
                 syncStatus === 'success' ? 'text-emerald-400' : 
                 syncStatus === 'error' ? 'text-red-400' : 'text-emerald-100/40'
               }`}>
-                {syncStatus === 'syncing' ? 'กำลังบันทึก...' : 
-                 syncStatus === 'success' ? 'บันทึกสำเร็จ ✓' : 
-                 syncStatus === 'error' ? 'ซิงค์ล้มเหลว' : 'ระบบออนไลน์'}
+                {syncStatus === 'syncing' ? 'กำลังบันทึกข้อมูล...' : 
+                 syncStatus === 'success' ? 'บันทึกเรียบร้อย ✓' : 
+                 syncStatus === 'error' ? 'การซิงค์ล้มเหลว' : 'เชื่อมต่อฐานข้อมูลแล้ว'}
               </span>
             </div>
             
             <button 
-              onClick={loadGlobalData}
+              onClick={() => loadGlobalData()}
               className="p-3 bg-white/10 hover:bg-white/20 rounded-xl border border-white/10 transition-all group active:scale-95"
-              title="ดึงข้อมูลล่าสุด"
+              title="ดึงข้อมูลใหม่"
             >
               <svg className={`w-5 h-5 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -201,24 +220,19 @@ const App: React.FC = () => {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 -mt-16 relative z-10 space-y-8">
-        <section className="bg-white p-6 md:p-8 rounded-3xl shadow-xl border border-slate-100 min-h-[140px] flex items-center">
-            <div className="w-full">
-                {apiError ? (
-                  <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 text-amber-800 flex items-center gap-3">
-                    <span className="text-2xl">⚙️</span>
-                    <div>
-                      <p className="font-bold text-sm">การแนะนำโดย AI</p>
-                      <p className="text-xs opacity-80">{apiError}</p>
-                    </div>
-                  </div>
-                ) : reflection ? (
+        <section className="bg-white p-6 md:p-8 rounded-3xl shadow-xl border border-slate-100 min-h-[140px] flex items-center overflow-hidden relative group">
+            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+              <svg className="w-24 h-24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
+            </div>
+            <div className="w-full relative z-10">
+                {reflection ? (
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-700">
-                        <blockquote className="text-xl font-serif italic text-slate-800 mb-2">"{reflection.quote}"</blockquote>
+                        <blockquote className="text-xl font-bold text-slate-800 mb-2 leading-relaxed">"{reflection.quote}"</blockquote>
                         <div className="flex items-center gap-3">
-                          <p className="text-emerald-600 font-bold text-sm">— {reflection.reference}</p>
+                          <p className="text-emerald-600 font-bold text-sm tracking-wide">— {reflection.reference}</p>
                           <div className="h-[1px] flex-grow bg-slate-100"></div>
                         </div>
-                        <p className="mt-3 text-slate-600 text-sm leading-relaxed">{reflection.message}</p>
+                        <p className="mt-3 text-slate-600 text-sm leading-relaxed font-medium">{reflection.message}</p>
                     </div>
                 ) : (
                     <div className="animate-pulse space-y-3">
