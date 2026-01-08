@@ -23,19 +23,26 @@ const App: React.FC = () => {
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
-  // ใช้สำหรับจัดการ Optimistic Updates และลดความหน่วง
   const pendingUpdates = useRef<Record<string, { value: boolean, timestamp: number }>>({});
 
   const loadGlobalData = useCallback(async (isSilent = false) => {
     if (!isSilent) setSyncStatus('syncing');
     try {
       const remoteData = await fetchProgressFromSheets();
-      if (remoteData) {
+      
+      // ป้องกันการเขียนทับด้วยค่าว่างหากเซิร์ฟเวอร์ส่งข้อมูลผิดพลาด
+      if (remoteData && Object.keys(remoteData).length > 0) {
         setProgress(prev => {
-          const newState = { ...remoteData };
-          const now = Date.now();
+          // Merge Logic: ผสานข้อมูลเก่าในเครื่องกับข้อมูลใหม่จากเซิร์ฟเวอร์
+          const newState = { ...prev, ...remoteData };
           
-          // นำค่าที่กำลังซิงค์ (ยังไม่ครบ 30 วิ) มาทับข้อมูลจากเซิร์ฟเวอร์เพื่อให้ UI ไม่กระโดด
+          // ตรวจสอบข้อมูลล่าสุดในแต่ละวันที่อาจมีการอัปเดตเหลื่อมล้ำกัน
+          Object.keys(remoteData).forEach(date => {
+            newState[date] = { ...prev[date], ...remoteData[date] };
+          });
+
+          const now = Date.now();
+          // รักษาค่าที่ผู้ใช้กำลังติ๊กอยู่ (Optimistic Updates) ไม่ให้โดนค่าเก่าจากเซิร์ฟเวอร์ดึงกลับ
           Object.entries(pendingUpdates.current).forEach(([key, update]) => {
             if (now - update.timestamp < 30000) {
               const [date, mId, tId] = key.split('|');
@@ -61,10 +68,10 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // ดึงข้อมูลครั้งแรกและตั้งค่า Polling ทุก 15 วินาที
   useEffect(() => {
     loadGlobalData();
-    const interval = setInterval(() => loadGlobalData(true), 15000);
+    // เพิ่มระยะเวลา Polling เป็น 30 วินาทีเพื่อลดภาระเซิร์ฟเวอร์และป้องกัน Race Condition
+    const interval = setInterval(() => loadGlobalData(true), 30000);
     return () => clearInterval(interval);
   }, [loadGlobalData]);
 
@@ -74,11 +81,9 @@ const App: React.FC = () => {
     const syncKey = `${date}|${memberId}|${taskId}`;
     let newValue = false;
 
-    // 1. Update State ทันที (Optimistic)
     setProgress(prev => {
       const currentValue = !!prev[date]?.[memberId]?.[taskId];
       newValue = !currentValue;
-      
       pendingUpdates.current[syncKey] = { value: newValue, timestamp: Date.now() };
       
       const updated = { ...prev };
@@ -91,8 +96,6 @@ const App: React.FC = () => {
     });
 
     setSyncStatus('syncing');
-    
-    // 2. ส่งข้อมูลไป Google Sheets
     try {
       const success = await syncProgressToSheets(date, memberId, taskId, newValue);
       if (success) {
@@ -110,11 +113,11 @@ const App: React.FC = () => {
   useEffect(() => {
     const fetchReflection = async () => {
       setReflection(null);
-      const res = await getDailyMotivation(`วันที่: ${currentDate}, ความคืบหน้าปัจจุบัน: ${JSON.stringify(progress[currentDate] || {})}`);
+      const res = await getDailyMotivation(`วันที่: ${currentDate}, สรุปกลุ่ม: ${JSON.stringify(progress[currentDate] || {})}`);
       setReflection(res);
     };
     fetchReflection();
-  }, [currentDate, activeMember]); // อัปเดตเมื่อเปลี่ยนวันที่หรือคนเข้าใช้งาน
+  }, [currentDate, activeMember]);
 
   const handleMemberSelect = (m: Member) => {
     setActiveMember(m);
@@ -141,7 +144,6 @@ const App: React.FC = () => {
         <LeaderSummaryModal currentDate={currentDate} progress={progress} onClose={() => setShowLeaderSummary(false)} />
       )}
 
-      {/* Header */}
       <header className="bg-emerald-950 text-white px-4 py-4 shadow-2xl sticky top-0 z-[50] border-b border-white/5 backdrop-blur-md">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -151,65 +153,60 @@ const App: React.FC = () => {
               <div className="flex items-center gap-2 mt-1">
                 <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'syncing' ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`}></div>
                 <p className="text-[8px] font-bold uppercase tracking-widest text-emerald-400">
-                  {syncStatus === 'syncing' ? 'กำลังซิงค์...' : 
-                   syncStatus === 'success' ? 'บันทึกสำเร็จ' : 
-                   syncStatus === 'error' ? 'การเชื่อมต่อผิดพลาด' : 'ระบบออนไลน์'}
+                  {syncStatus === 'syncing' ? 'กำลังส่งข้อมูล...' : 
+                   syncStatus === 'success' ? 'บันทึกเรียบร้อย' : 
+                   syncStatus === 'error' ? 'การเชื่อมต่อขัดข้อง' : 'ระบบออนไลน์'}
                 </p>
               </div>
             </div>
           </div>
           
           <div className="flex items-center gap-2">
+            <button 
+              onClick={() => loadGlobalData()}
+              className="p-2 bg-white/5 hover:bg-white/10 rounded-xl transition-colors border border-white/5"
+              title="รีเฟรชข้อมูล"
+            >
+              <svg className={`w-4 h-4 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+            </button>
             <input 
               type="date" 
               value={currentDate}
               onChange={(e) => setCurrentDate(e.target.value)}
               className="bg-emerald-900/50 text-white text-[10px] font-black py-2 px-3 rounded-xl border border-white/10 outline-none focus:ring-2 ring-emerald-500 w-32"
             />
-            {activeMember && (
-              <button 
-                onClick={() => setShowMemberSelector(true)}
-                className="bg-emerald-500 hover:bg-emerald-400 text-white p-2 rounded-xl shadow-lg transition-all active:scale-95"
-                title="เปลี่ยนผู้ใช้งาน"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-              </button>
-            )}
           </div>
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 pt-6 space-y-6">
-        {/* Reflection Card */}
-        <section className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-50 rounded-full -mr-20 -mt-20 blur-3xl opacity-50 group-hover:opacity-100 transition-opacity"></div>
+        <section className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-emerald-50 rounded-full -mr-20 -mt-20 blur-3xl opacity-50"></div>
           {reflection ? (
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-700 relative z-10">
               <div className="flex justify-between items-start gap-4 mb-3">
                 <p className="text-xl md:text-2xl font-black text-slate-800 leading-tight">"{reflection.quote}"</p>
                 {activeMember && (
-                   <div className="flex flex-col items-end flex-shrink-0 bg-slate-50 px-3 py-2 rounded-2xl border border-slate-100">
-                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">กำลังใช้งานโดย</span>
+                   <div className="flex flex-col items-end flex-shrink-0 bg-emerald-50/50 px-3 py-2 rounded-2xl border border-emerald-100">
+                      <span className="text-[8px] font-black text-emerald-600/60 uppercase tracking-tighter">เข้าใช้โดย</span>
                       <span className="text-emerald-900 font-black text-sm">{activeMember.name}</span>
                    </div>
                 )}
               </div>
               <div className="flex items-center gap-3 mb-3">
                 <span className="text-emerald-600 font-black text-[10px] uppercase tracking-[0.2em]">{reflection.reference}</span>
-                <div className="h-[1px] flex-grow bg-slate-100 rounded-full"></div>
+                <div className="h-[1px] flex-grow bg-emerald-100/30 rounded-full"></div>
               </div>
-              <p className="text-slate-500 text-xs font-medium leading-relaxed italic opacity-80">{reflection.message}</p>
+              <p className="text-slate-500 text-xs font-medium leading-relaxed italic">{reflection.message}</p>
             </div>
           ) : (
             <div className="animate-pulse flex flex-col gap-3">
               <div className="h-6 bg-slate-100 rounded-full w-3/4"></div>
-              <div className="h-2 bg-slate-50 rounded-full w-1/4"></div>
               <div className="h-10 bg-slate-50 rounded-2xl w-full"></div>
             </div>
           )}
         </section>
 
-        {/* Tables and Stats */}
         <div className="grid grid-cols-1 gap-6">
           <ChecklistTable 
             currentDate={currentDate} 
@@ -218,21 +215,17 @@ const App: React.FC = () => {
             onToggle={handleToggle}
             onOpenSelector={() => setShowMemberSelector(true)}
           />
-
           <StatsPanel currentDate={currentDate} progress={progress} />
         </div>
       </main>
 
-      {/* Sync Status Toast (Mobile Only) */}
       {syncStatus !== 'idle' && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] sm:hidden">
           <div className={`px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest animate-in fade-in slide-in-from-bottom-4 ${
             syncStatus === 'syncing' ? 'bg-amber-500 text-white' : 
             syncStatus === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
           }`}>
-            {syncStatus === 'syncing' && <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>}
-            {syncStatus === 'syncing' ? 'บันทึกข้อมูล...' : 
-             syncStatus === 'success' ? 'ซิงค์เรียบร้อย' : 'ผิดพลาด! ลองใหม่'}
+            {syncStatus === 'syncing' ? 'กำลังบันทึก...' : 'ซิงค์เรียบร้อย'}
           </div>
         </div>
       )}
