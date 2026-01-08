@@ -44,16 +44,20 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ currentDate, progress }) => {
         </button>
       </div>
       
-      <div className="h-64 w-full min-w-0 overflow-hidden">
+      {/* เพิ่มส่วนสูงของ Container เล็กน้อยเพื่อให้เพียงพอต่อการแสดงผลรายชื่อที่เอียง */}
+      <div className="h-72 w-full min-w-0 overflow-hidden">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+          <BarChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 20 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
             <XAxis 
               dataKey="name" 
               axisLine={false} 
               tickLine={false} 
-              tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} 
+              tick={{ fontSize: 9, fontWeight: 700, fill: '#64748b' }} 
               interval={0}
+              angle={-45}
+              textAnchor="end"
+              height={60}
             />
             <YAxis hide domain={[0, TASKS.length]} />
             <Tooltip 
