@@ -1,7 +1,6 @@
 
 import { ProgressData } from '../types';
 
-// อัปเดตเป็นลิงก์ล่าสุดที่ได้รับ
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxO5U99nteeyh2_-2mLmfJjfkqj7Rc2I62XbaaDbkpYgyJpzSeD3Fdo5N6NmKbCMsVW/exec'; 
 
 const formatDateKey = (dateInput: any): string => {
@@ -41,16 +40,15 @@ export async function fetchProgressFromSheets(): Promise<ProgressData | null> {
   }
 }
 
-// ปรับปรุง Batch Sync ให้ส่งข้อมูลแบบ Text/Plain เพื่อเลี่ยง CORS Preflight ที่ทำให้ช้า
 export async function syncBatchToSheets(items: {date: string, memberId: string, taskId: string, status: boolean}[]): Promise<boolean> {
   if (!SCRIPT_URL || SCRIPT_URL.includes('XXXXX') || items.length === 0) return false;
 
   try {
-    // ใช้ no-cors เพื่อความเร็วสูงสุดในการยิง Request ออกไป
-    // Google Script จะได้รับข้อมูลเป็น string ใน e.postData.contents
+    // ใช้ mode: 'no-cors' และ keepalive: true เพื่อความเร็วสูงสุดและรับประกันการส่งข้อมูล
     await fetch(SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors', 
+      keepalive: true, // สำคัญ: ช่วยให้ Request ทำงานต่อแม้ปิด Browser ทันที
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify(items),
     });

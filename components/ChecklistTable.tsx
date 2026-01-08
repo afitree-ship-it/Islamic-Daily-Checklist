@@ -31,6 +31,7 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
     return active ? [active, ...others] : MEMBERS;
   }, [activeMemberId]);
 
+  // ฟังก์ชันเช็คสถานะการซิงค์แบบเงียบๆ
   const isPending = (memberId: string, taskId: string) => {
     return syncQueue.some(q => q.date === currentDate && q.memberId === memberId && q.taskId === taskId);
   };
@@ -44,32 +45,30 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
         </h3>
         
         <div className="flex flex-col items-end gap-2">
-          {/* ส่วนเลือกวันที่ใหม่ - ใหญ่ขึ้นและกดง่ายขึ้น */}
           <div className="relative group">
             <span className="absolute -top-2 right-3 bg-white px-2 text-[8px] font-black text-emerald-600 uppercase tracking-widest z-10 border border-emerald-100 rounded-full">
-              เลือกวันที่
+              วันที่
             </span>
             <input 
               type="date" 
               value={currentDate}
               onChange={(e) => onDateChange(e.target.value)}
-              className="bg-white text-slate-800 text-sm font-black py-3 px-4 rounded-2xl border-2 border-emerald-100 hover:border-emerald-500 transition-all outline-none shadow-sm cursor-pointer w-44"
+              className="bg-white text-slate-800 text-sm font-black py-3 px-4 rounded-2xl border-2 border-emerald-100 focus:border-emerald-500 transition-all outline-none shadow-sm cursor-pointer w-44"
             />
           </div>
 
           <button 
             onClick={onOpenSelector}
-            className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white text-[10px] font-black rounded-xl border border-orange-400 hover:bg-orange-600 transition-all shadow-lg shadow-orange-200 active:scale-95 uppercase tracking-widest"
+            className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white text-[10px] font-black rounded-xl border border-orange-400 hover:bg-orange-600 transition-all shadow-lg active:scale-95 uppercase tracking-widest"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
-            เปลี่ยนแปลงคน
+            เปลี่ยนคน
           </button>
         </div>
       </div>
 
-      {/* Mobile View */}
       <div className="grid grid-cols-1 gap-4 lg:hidden">
         {sortedMembers.map((member) => {
           const isMe = member.id === activeMemberId;
@@ -79,8 +78,8 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
           return (
             <div 
               key={member.id} 
-              className={`rounded-[2rem] border overflow-hidden transition-all duration-500 shadow-sm bg-white ${
-                isMe ? 'border-emerald-200 ring-4 ring-emerald-500/10' : 'border-slate-100'
+              className={`rounded-[2rem] border overflow-hidden transition-all duration-300 shadow-sm bg-white ${
+                isMe ? 'border-emerald-200 ring-2 ring-emerald-500/5' : 'border-slate-100'
               }`}
             >
               <div className={`px-5 py-3 flex justify-between items-center ${isMe ? 'bg-emerald-50/50' : 'bg-slate-50/30'}`}>
@@ -88,9 +87,9 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
                   <span className={`text-sm font-black uppercase tracking-tight ${isMe ? 'text-emerald-900' : 'text-slate-600'}`}>
                     {member.name}
                   </span>
-                  {isMe && <span className="bg-emerald-100 text-emerald-700 text-[9px] px-2 py-0.5 rounded-full font-black">คุณ</span>}
+                  {isMe && <span className="bg-emerald-600 text-white text-[8px] px-2 py-0.5 rounded-full font-black uppercase">Me</span>}
                 </div>
-                <div className={`text-[10px] font-black px-3 py-1 rounded-xl ${isMe ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                <div className={`text-[10px] font-black px-3 py-1 rounded-xl ${isMe ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-500'}`}>
                   {completedCount}/{TASKS.length}
                 </div>
               </div>
@@ -104,32 +103,30 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
                   return (
                     <button
                       key={task.id}
-                      onClick={() => {
-                        if (activeMemberId === null) onOpenSelector();
-                        else if (isMe) onToggle(currentDate, member.id, task.id);
-                      }}
+                      onClick={() => isMe && onToggle(currentDate, member.id, task.id)}
                       disabled={isInteractionDisabled}
-                      className={`group relative flex flex-col items-center justify-center gap-2 p-3 rounded-2xl transition-all duration-300 ${
+                      className={`group relative flex flex-col items-center justify-center gap-2 p-3 rounded-2xl transition-all duration-150 ${
                         isChecked 
-                          ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg'
+                          ? 'bg-emerald-600 text-white shadow-md'
                           : 'bg-white border border-slate-100 text-slate-600'
-                      } ${isInteractionDisabled ? 'opacity-40 grayscale' : 'active:scale-95'} ${pending ? 'animate-pulse' : ''}`}
+                      } ${isInteractionDisabled ? 'opacity-30 grayscale cursor-not-allowed' : 'active:scale-[0.97]'}`}
                     >
+                      {/* Indicator ซิงค์แบบเงียบๆ ไม่เด้งรบกวน */}
                       {pending && (
-                        <div className="absolute top-2 right-2 flex items-center justify-center">
-                          <div className="w-2 h-2 bg-amber-400 rounded-full animate-ping"></div>
+                        <div className="absolute top-1 right-1">
+                          <div className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse"></div>
                         </div>
                       )}
                       
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                        isChecked ? 'bg-white/20' : 'bg-slate-50 border border-slate-200'
+                        isChecked ? 'bg-white/20' : 'bg-slate-50 border border-slate-100'
                       }`}>
                         {isChecked ? (
-                          <svg className={`w-5 h-5 text-white ${pending ? 'animate-bounce' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.5" d="M5 13l4 4L19 7" />
                           </svg>
                         ) : (
-                           <div className={`w-1.5 h-1.5 rounded-full ${pending ? 'bg-amber-400' : 'bg-slate-300'}`}></div>
+                           <div className="w-1.5 h-1.5 rounded-full bg-slate-200"></div>
                         )}
                       </div>
                       
@@ -146,7 +143,6 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
         })}
       </div>
 
-      {/* Desktop View */}
       <div className="hidden lg:block overflow-hidden shadow-xl rounded-[3rem] border border-emerald-100 bg-white">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left border-collapse">
@@ -169,10 +165,10 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
 
                 return (
                   <tr key={member.id} className={`${isMe ? 'bg-emerald-50/30' : 'hover:bg-slate-50/50'}`}>
-                    <td className={`px-8 py-5 sticky left-0 z-20 shadow-md ${isMe ? 'bg-emerald-50' : 'bg-white'}`}>
+                    <td className={`px-8 py-5 sticky left-0 z-20 shadow-sm ${isMe ? 'bg-emerald-50' : 'bg-white'}`}>
                       <div className="flex flex-col">
-                        <span className="font-black text-lg text-slate-800">{isMe && '👤 '}{member.name}</span>
-                        {isMe && <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">คุณกำลังใช้งาน</span>}
+                        <span className="font-black text-lg text-slate-800">{member.name}</span>
+                        {isMe && <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">คุณกำลังใช้งาน</span>}
                       </div>
                     </td>
                     {TASKS.map((task) => {
@@ -181,26 +177,23 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
                       return (
                         <td key={task.id} className="p-2 text-center relative">
                           <button
-                            onClick={() => {
-                              if (activeMemberId === null) onOpenSelector();
-                              else if (isMe) onToggle(currentDate, member.id, task.id);
-                            }}
+                            onClick={() => isMe && onToggle(currentDate, member.id, task.id)}
                             disabled={isInteractionDisabled}
-                            className={`w-full aspect-square max-h-16 rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-300 ${
+                            className={`w-full aspect-square max-h-16 rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-150 ${
                               isChecked 
-                                ? 'bg-gradient-to-br from-emerald-500 to-teal-600 border-transparent text-white shadow-lg scale-95' 
+                                ? 'bg-emerald-600 border-transparent text-white shadow-md' 
                                 : 'border-slate-100 bg-white hover:border-emerald-200'
-                            } ${isInteractionDisabled ? 'opacity-10 cursor-not-allowed' : 'hover:scale-105'} ${pending ? 'animate-pulse scale-90' : ''}`}
+                            } ${isInteractionDisabled ? 'opacity-10 cursor-not-allowed' : 'hover:scale-[1.03] active:scale-95'}`}
                           >
                             {pending && (
-                              <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-amber-500 rounded-full border-2 border-white animate-bounce shadow-sm"></div>
+                              <div className="absolute top-1 right-1 w-2 h-2 bg-amber-400 rounded-full border border-white"></div>
                             )}
                             {isChecked ? (
-                              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" />
                               </svg>
                             ) : (
-                              <div className={`w-2 h-2 rounded-full ${pending ? 'bg-amber-400' : 'bg-slate-200'}`}></div>
+                              <div className="w-1.5 h-1.5 rounded-full bg-slate-100"></div>
                             )}
                           </button>
                         </td>

@@ -29,8 +29,8 @@ const App: React.FC = () => {
 
   const localInteractions = useRef<Record<string, number>>({});
   const isProcessingQueue = useRef(false);
-  const queueTimeoutRef = useRef<number | null>(null);
-  const [lastUpdatedText, setLastUpdatedText] = useState<string>('รอดึงข้อมูล...');
+  const debounceTimerRef = useRef<number | null>(null);
+  const [lastUpdatedText, setLastUpdatedText] = useState<string>('เชื่อมต่อแล้ว');
 
   const [reflection, setReflection] = useState<DailyReflection | null>(null);
   const [showLeaderSummary, setShowLeaderSummary] = useState(false);
@@ -47,7 +47,7 @@ const App: React.FC = () => {
 
   const mergeProgress = useCallback((remote: ProgressData) => {
     const now = Date.now();
-    const GRACE_PERIOD = 5000; 
+    const GRACE_PERIOD = 3000; 
 
     setProgress(prev => {
       const next = { ...prev };
@@ -68,7 +68,7 @@ const App: React.FC = () => {
       });
       return { ...next };
     });
-    setLastUpdatedText(`ซิงค์ล่าสุด: ${new Date().toLocaleTimeString('th-TH')}`);
+    setLastUpdatedText(`ซิงค์ล่าสุด ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}`);
   }, [syncQueue]);
 
   const loadGlobalData = useCallback(async (isSilent = false) => {
@@ -78,15 +78,12 @@ const App: React.FC = () => {
       if (remoteData) {
         mergeProgress(remoteData);
         if (!isSilent) setSyncStatus('success');
-      } else {
-        if (!isSilent) setSyncStatus('error');
       }
     } catch (err) {
-      console.error("Load Global Data Error:", err);
       if (!isSilent) setSyncStatus('error');
     } finally {
       setIsInitialLoading(false);
-      if (!isSilent) setTimeout(() => setSyncStatus('idle'), 2000);
+      if (!isSilent) setTimeout(() => setSyncStatus('idle'), 1000);
     }
   }, [mergeProgress]);
 
@@ -96,6 +93,7 @@ const App: React.FC = () => {
     isProcessingQueue.current = true;
     setSyncStatus('syncing');
     
+    // ดึงข้อมูลล่าสุดของแต่ละงานในคิว (ป้องกันการส่งซ้ำถ้ากดรัวๆ)
     const uniqueTasks = new Map<string, SyncQueueItem>();
     syncQueue.forEach(item => {
       const key = `${item.date}|${item.memberId}|${item.taskId}`;
@@ -105,6 +103,7 @@ const App: React.FC = () => {
     });
 
     const itemsToSync = Array.from(uniqueTasks.values());
+    const currentQueueIds = itemsToSync.map(i => i.id);
     
     try {
       const success = await syncBatchToSheets(itemsToSync.map(i => ({
@@ -115,32 +114,39 @@ const App: React.FC = () => {
       })));
 
       if (success) {
-        const processedTimestamp = Math.max(...itemsToSync.map(i => i.timestamp));
-        setSyncQueue(prev => prev.filter(q => q.timestamp > processedTimestamp));
+        setSyncQueue(prev => prev.filter(q => !currentQueueIds.includes(q.id)));
         setSyncStatus('success');
-        setTimeout(() => loadGlobalData(true), 300);
+        // ดึงข้อมูลรวมใหม่แบบเงียบๆ
+        setTimeout(() => loadGlobalData(true), 1000);
       } else {
         setSyncStatus('error');
       }
     } catch (e) {
-      console.error("Batch sync failed:", e);
       setSyncStatus('error');
     } finally {
       isProcessingQueue.current = false;
-      setTimeout(() => setSyncStatus('idle'), 2000);
+      setTimeout(() => setSyncStatus('idle'), 1500);
     }
   }, [syncQueue, loadGlobalData]);
 
+  // ระบบ Auto-fire: ส่งข้อมูลทันทีเมื่อหยุดกด
   useEffect(() => {
-    const interval = setInterval(processQueue, 5000);
-    return () => clearInterval(interval);
-  }, [processQueue]);
+    if (syncQueue.length > 0) {
+      if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = window.setTimeout(() => {
+        processQueue();
+      }, 800); // รอ 0.8 วินาทีหลังจากกดครั้งสุดท้ายแล้วส่งทันที
+    }
+    return () => {
+      if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
+    };
+  }, [syncQueue.length, processQueue]);
 
   useEffect(() => {
     loadGlobalData();
     const interval = setInterval(() => {
-      if (syncQueue.length === 0) loadGlobalData(true);
-    }, 25000); 
+      if (syncQueue.length === 0 && !isProcessingQueue.current) loadGlobalData(true);
+    }, 30000); 
     return () => clearInterval(interval);
   }, [loadGlobalData, syncQueue.length]);
 
@@ -153,15 +159,7 @@ const App: React.FC = () => {
     
     localInteractions.current[interactionKey] = Date.now();
 
-    const currentMemberData = progress[date]?.[memberId] || {};
-    const willBeCompletedCount = Object.keys(currentMemberData).filter(tId => tId !== taskId && currentMemberData[tId]).length + (newValue ? 1 : 0);
-
-    const userCelebrationKey = `${date}-${memberId}`;
-    if (willBeCompletedCount === TASKS.length && !currentValue && !hasCelebratedToday[userCelebrationKey]) {
-      setShowCelebration(true);
-      setHasCelebratedToday(prev => ({ ...prev, [userCelebrationKey]: true }));
-    }
-
+    // 1. Update UI ทันที (Optimistic)
     setProgress(prev => ({
       ...prev,
       [date]: {
@@ -173,6 +171,16 @@ const App: React.FC = () => {
       }
     }));
 
+    // เช็ค Celebration
+    const currentMemberData = progress[date]?.[memberId] || {};
+    const willBeCompletedCount = Object.keys(currentMemberData).filter(tId => tId !== taskId && currentMemberData[tId]).length + (newValue ? 1 : 0);
+    const userCelebrationKey = `${date}-${memberId}`;
+    if (willBeCompletedCount === TASKS.length && !currentValue && !hasCelebratedToday[userCelebrationKey]) {
+      setShowCelebration(true);
+      setHasCelebratedToday(prev => ({ ...prev, [userCelebrationKey]: true }));
+    }
+
+    // 2. เพิ่มเข้าคิวรอส่งเบื้องหลัง
     const newItem: SyncQueueItem = {
       id: `${Date.now()}-${interactionKey}`,
       date,
@@ -183,12 +191,7 @@ const App: React.FC = () => {
     };
     
     setSyncQueue(prev => [...prev, newItem]);
-
-    if (queueTimeoutRef.current) clearTimeout(queueTimeoutRef.current);
-    queueTimeoutRef.current = window.setTimeout(() => {
-      processQueue();
-    }, 200);
-  }, [activeMember, progress, processQueue, hasCelebratedToday]);
+  }, [activeMember, progress, hasCelebratedToday]);
 
   useEffect(() => {
     let isMounted = true;
@@ -211,7 +214,7 @@ const App: React.FC = () => {
       {isInitialLoading && (
         <div className="fixed inset-0 z-[1000] bg-emerald-950 flex flex-col items-center justify-center text-white">
           <div className="w-12 h-12 border-4 border-emerald-400 border-t-transparent rounded-full animate-spin mb-6"></div>
-          <p className="font-black text-sm tracking-[0.3em] uppercase opacity-50">DeenTracker Syncing...</p>
+          <p className="font-black text-sm tracking-[0.3em] uppercase opacity-50">DeenTracker Loading...</p>
         </div>
       )}
 
@@ -233,23 +236,25 @@ const App: React.FC = () => {
       <header className="bg-emerald-950 text-white px-4 py-4 shadow-2xl sticky top-0 z-[50] border-b border-white/5 backdrop-blur-md">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
-            {/* Modern Outline Header Icon */}
-            <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center border border-white/10 shadow-inner backdrop-blur-sm">
-              <svg className="w-6 h-6 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center border border-white/10 shadow-inner backdrop-blur-sm relative">
+               <svg className="w-6 h-6 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" strokeDasharray="3 2" className="opacity-30" />
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                 <polyline points="22 4 12 14.01 9 11.01" strokeWidth="3" className="text-white" />
               </svg>
+              {/* แถบสถานะซิงค์เล็กๆ ใต้อิมเมจ */}
+              {syncStatus === 'syncing' && (
+                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-amber-400 rounded-full border-2 border-emerald-950 animate-pulse"></div>
+              )}
             </div>
             <div className="flex flex-col items-start min-w-0">
               <h1 className="text-xl font-black tracking-tighter leading-none">DEENTRACKER</h1>
               <p className="text-[5px] text-white/20 font-bold whitespace-nowrap leading-none mt-1 uppercase w-full" style={{ textAlignLast: 'justify' }}>
                 Create & Design By: Afitree Yamaenoh
               </p>
-              <div className="flex items-center gap-2 mt-1.5">
-                <div className={`w-1.5 h-1.5 rounded-full ${syncQueue.length > 0 ? 'bg-amber-400 animate-pulse' : (syncStatus === 'error' ? 'bg-red-500' : 'bg-emerald-400')}`}></div>
-                <p className="text-[8px] font-bold uppercase tracking-widest text-emerald-400/80">
-                  {syncQueue.length > 0 ? `กำลังส่งข้อมูล ${syncQueue.length} รายการ...` : lastUpdatedText}
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <p className="text-[8px] font-bold uppercase tracking-widest text-emerald-400/60">
+                  {syncStatus === 'syncing' ? 'กำลังบันทึกเบื้องหลัง...' : lastUpdatedText}
                 </p>
               </div>
             </div>
@@ -258,13 +263,14 @@ const App: React.FC = () => {
           <div className="flex items-center gap-2">
             <button 
               onClick={() => loadGlobalData()}
-              title="Refresh Data"
-              className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-colors border border-white/5"
+              className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-colors border border-white/5 active:scale-90"
             >
-              <svg className={`w-5 h-5 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357-2H15" /></svg>
+              <svg className={`w-5 h-5 ${syncStatus === 'syncing' ? 'animate-spin opacity-50' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357-2H15" /></svg>
             </button>
           </div>
         </div>
+        {/* Progress bar แบบบางเฉียบใต้ Header ขณะส่งข้อมูล */}
+        <div className={`absolute bottom-0 left-0 h-[2px] bg-emerald-400 transition-all duration-1000 ${syncStatus === 'syncing' ? 'w-full opacity-100' : 'w-0 opacity-0'}`}></div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 pt-6 space-y-6">
@@ -287,7 +293,6 @@ const App: React.FC = () => {
             <div className="animate-pulse flex flex-col gap-3 py-4">
               <div className="h-6 bg-slate-100 rounded-full w-3/4"></div>
               <div className="h-4 bg-slate-50 rounded-full w-1/2 mt-4"></div>
-              <div className="h-10 bg-slate-50 rounded-2xl w-full mt-2"></div>
             </div>
           )}
         </section>
@@ -305,11 +310,12 @@ const App: React.FC = () => {
         <StatsPanel currentDate={currentDate} progress={progress} />
       </main>
 
-      {syncQueue.length > 0 && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100]">
-          <div className="bg-emerald-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 text-xs font-black uppercase tracking-widest shadow-emerald-200/50 border border-emerald-400/50">
-            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-            กำลังบันทึก {syncQueue.length} รายการ...
+      {/* ย้ายการแจ้งเตือนไปไว้ที่มุมเล็กๆ หรือซ่อนไปเลยเพื่อไม่ให้ขัดจังหวะผู้ใช้ */}
+      {syncStatus === 'error' && (
+        <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-right duration-300">
+          <div className="bg-red-600 text-white px-4 py-2 rounded-xl shadow-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            การซิงค์ผิดพลาด จะลองใหม่เร็วๆ นี้
           </div>
         </div>
       )}
