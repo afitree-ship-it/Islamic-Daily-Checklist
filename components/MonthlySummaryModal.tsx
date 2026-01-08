@@ -39,17 +39,37 @@ const MonthlySummaryModal: React.FC<MonthlySummaryModalProps> = ({ progress, onC
     return stats.sort((a, b) => b.percentage - a.percentage);
   }, [progress, currentMonth]);
 
+  const groupAverage = useMemo(() => {
+    if (monthlyStats.length === 0) return 0;
+    const total = monthlyStats.reduce((acc, curr) => acc + curr.percentage, 0);
+    return Math.round(total / monthlyStats.length);
+  }, [monthlyStats]);
+
   const handleExport = () => {
-    const monthName = new Date().toLocaleDateString('th-TH', { month: 'long', year: 'numeric' });
-    let content = `สรุปผลความคืบหน้า DeenTracker - ${monthName}\n`;
-    content += `==========================================\n\n`;
+    const now = new Date();
+    const monthLong = now.toLocaleDateString('th-TH', { month: 'long' });
+    const yearThai = now.toLocaleDateString('th-TH', { year: 'numeric' });
+    const fullDateText = `${monthLong} ${yearThai}`;
+    
+    let content = `📊 สรุปรายงานความคืบหน้า DeenTracker\n`;
+    content += `📅 ประจำเดือน: ${fullDateText}\n`;
+    content += `📈 ภาพรวมกลุ่ม: ${groupAverage}%\n`;
+    content += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    
+    content += `รายชื่อสมาชิกและสถิติความสำเร็จ:\n\n`;
     
     monthlyStats.forEach((stat, idx) => {
-      content += `${idx + 1}. ${stat.memberName}\n`;
-      content += `   ความสำเร็จ: ${stat.percentage}%\n`;
-      content += `   กิจกรรมที่ทำ: ${stat.totalCompleted} จาก ${stat.totalPossible} ครั้ง\n`;
-      content += `------------------------------------------\n`;
+      const medal = idx === 0 ? '🥇 ' : idx === 1 ? '🥈 ' : idx === 2 ? '🥉 ' : '🔹 ';
+      content += `${medal}${idx + 1}. ${stat.memberName}\n`;
+      content += `   • เดือน/ปี: ${fullDateText}\n`;
+      content += `   • ระดับความสำเร็จ: ${stat.percentage}%\n`;
+      content += `   • บันทึกกิจกรรม: ${stat.totalCompleted} ครั้ง (จากทั้งหมด ${stat.totalPossible} รายการ)\n`;
+      content += `   • สถานะ: ${stat.percentage >= 80 ? 'ดีเยี่ยม (Excellent)' : stat.percentage >= 50 ? 'ดี (Good)' : 'กำลังพัฒนา (Keep going)'}\n`;
+      content += `────────────────────────────────────────────\n`;
     });
+
+    content += `\nพิมพ์เมื่อวันที่: ${new Date().toLocaleDateString('th-TH')} เวลา ${new Date().toLocaleTimeString('th-TH')}\n`;
+    content += `ขอให้ความดีที่เราทำร่วมกันเป็นบารอกัตแก่พวกเราทุกคน อามีน`;
 
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -76,6 +96,16 @@ const MonthlySummaryModal: React.FC<MonthlySummaryModalProps> = ({ progress, onC
         </div>
 
         <div className="p-6 overflow-y-auto max-h-[60vh] space-y-3">
+          <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100 mb-2">
+            <div className="flex justify-between items-center">
+              <span className="text-[10px] font-black text-emerald-800 uppercase tracking-widest">ภาพรวมกลุ่มเดือนนี้</span>
+              <span className="text-xl font-black text-emerald-900">{groupAverage}%</span>
+            </div>
+            <div className="w-full h-2 bg-emerald-200/50 rounded-full mt-2 overflow-hidden">
+               <div className="h-full bg-emerald-600 transition-all duration-1000" style={{ width: `${groupAverage}%` }}></div>
+            </div>
+          </div>
+
           {monthlyStats.map((stat, idx) => (
             <div key={stat.memberId} className="bg-slate-50 rounded-2xl p-4 border border-slate-100 flex items-center gap-4 group hover:bg-white hover:border-emerald-200 transition-all">
               <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-black text-xs group-hover:bg-emerald-500 group-hover:text-white transition-colors">
