@@ -16,60 +16,72 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({ currentDate, progress, 
 
   return (
     <div className="space-y-6">
-      {/* Mobile View: Compact Cards */}
+      {/* Mobile View: Modern Card List */}
       <div className="grid grid-cols-1 gap-4 lg:hidden">
         {MEMBERS.map((member) => {
           const isMe = member.id === activeMemberId;
-          const isLocked = activeMemberId !== null && !isMe;
           const memberData = dailyProgress[member.id] || {};
           const completedCount = Object.values(memberData).filter(v => v).length;
 
           return (
             <div 
               key={member.id} 
-              className={`rounded-2xl border transition-all ${
-                isMe ? 'border-emerald-500 bg-white shadow-lg ring-2 ring-emerald-50' : 'border-slate-200 bg-slate-50/30'
-              } ${isLocked ? 'opacity-80' : ''}`}
+              className={`rounded-[2rem] border overflow-hidden transition-all duration-500 shadow-sm ${
+                isMe 
+                  ? 'border-emerald-200 bg-white ring-4 ring-emerald-500/10' 
+                  : 'border-slate-100 bg-white/60'
+              }`}
             >
-              <div className={`px-4 py-3 flex justify-between items-center border-b ${isMe ? 'border-emerald-100' : 'border-slate-100'}`}>
+              {/* Card Header */}
+              <div className={`px-5 py-3 flex justify-between items-center ${isMe ? 'bg-emerald-50/50 border-b border-emerald-100' : 'bg-slate-50/30'}`}>
                 <div className="flex items-center gap-2">
-                  <span className={`text-base font-black ${isMe ? 'text-emerald-900' : 'text-slate-700'}`}>{member.name}</span>
-                  {isMe && <span className="bg-emerald-600 text-white text-[9px] px-1.5 py-0.5 rounded-md uppercase font-black">คุณ</span>}
+                  <div className={`w-2 h-2 rounded-full ${isMe ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></div>
+                  <span className={`text-sm font-black uppercase tracking-tight ${isMe ? 'text-emerald-900' : 'text-slate-600'}`}>{member.name}</span>
+                  {isMe && <span className="bg-amber-100 text-amber-700 text-[9px] px-2 py-0.5 rounded-full font-black ml-1">USER</span>}
                 </div>
-                <div className="text-[10px] font-bold text-slate-400 bg-white px-2 py-1 rounded-full border border-slate-100">
-                  สำเร็จ {completedCount}/{TASKS.length}
+                <div className={`text-[10px] font-black px-3 py-1 rounded-xl shadow-sm ${isMe ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                  {completedCount}/{TASKS.length}
                 </div>
               </div>
               
+              {/* Task Grid - Modern Square Style */}
               <div className="p-3 grid grid-cols-2 gap-2">
                 {TASKS.map((task) => {
                   const isChecked = !!memberData[task.id];
+                  const isInteractionDisabled = !isMe && activeMemberId !== null;
+
                   return (
                     <button
                       key={task.id}
                       onClick={() => {
-                        if (!isLocked) {
-                          if (activeMemberId === null) onOpenSelector();
-                          else onToggle(currentDate, member.id, task.id);
-                        }
+                        if (activeMemberId === null) onOpenSelector();
+                        else if (isMe) onToggle(currentDate, member.id, task.id);
                       }}
-                      disabled={isLocked}
-                      className={`relative flex flex-col items-start p-3 rounded-xl border transition-all text-left h-16 ${
+                      disabled={isInteractionDisabled}
+                      className={`group relative flex flex-col items-center justify-center gap-2 p-3 rounded-2xl transition-all duration-300 ${
                         isChecked 
-                          ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm' 
-                          : `bg-white border-slate-200 text-slate-600`
-                      } ${isLocked ? 'grayscale-[0.3]' : 'active:scale-95'}`}
+                          ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-200'
+                          : 'bg-white border border-slate-100 text-slate-600 hover:border-emerald-200'
+                      } ${isInteractionDisabled ? 'opacity-40 grayscale' : 'active:scale-90 hover:scale-[0.98]'}`}
                     >
-                      <span className={`text-[8px] font-bold uppercase tracking-tight mb-0.5 ${isChecked ? 'text-emerald-100' : 'text-slate-400'}`}>
-                        {task.category}
-                      </span>
-                      <span className="text-xs font-bold leading-tight line-clamp-2">{task.label}</span>
-                      <div className={`absolute top-2 right-2 w-4 h-4 rounded-full flex items-center justify-center border ${
-                        isChecked ? 'bg-white border-white text-emerald-600' : 'bg-slate-50 border-slate-100 text-transparent'
+                      {/* Checkbox Icon - Modern Rounded Circle */}
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+                        isChecked 
+                          ? 'bg-white/20' 
+                          : 'bg-slate-50 border border-slate-200 group-hover:bg-emerald-50 group-hover:border-emerald-200'
                       }`}>
-                        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" />
-                        </svg>
+                        {isChecked ? (
+                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.5" d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                           <div className="w-1.5 h-1.5 rounded-full bg-slate-300 group-hover:bg-emerald-400"></div>
+                        )}
+                      </div>
+                      
+                      <div className="text-center">
+                        <p className={`text-[11px] font-black leading-none mb-0.5 ${isChecked ? 'text-white' : 'text-slate-800'}`}>{task.label}</p>
+                        <p className={`text-[8px] uppercase font-bold tracking-widest ${isChecked ? 'text-emerald-100' : 'text-slate-400'}`}>{task.category}</p>
                       </div>
                     </button>
                   );
@@ -80,56 +92,91 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({ currentDate, progress, 
         })}
       </div>
 
-      {/* Desktop View: Table (Keep and refine) */}
-      <div className="hidden lg:block overflow-x-auto shadow-xl rounded-2xl border border-slate-200 bg-white">
-        <table className="w-full text-sm text-left border-collapse">
-          <thead className="text-xs text-emerald-700 uppercase bg-emerald-50/80">
-            <tr>
-              <th className="px-6 py-4 font-bold border-r min-w-[160px] sticky left-0 z-40 bg-emerald-50 shadow-[2px_0_0_0_rgba(0,0,0,0.05)]">สมาชิก</th>
-              {TASKS.map(task => (
-                <th key={task.id} className="px-2 py-4 text-center font-bold min-w-[100px]">{task.label}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {MEMBERS.map((member) => {
-              const isMe = member.id === activeMemberId;
-              const isLocked = activeMemberId !== null && !isMe;
-              return (
-                <tr key={member.id} className={isMe ? 'bg-emerald-50/30' : 'hover:bg-slate-50/50 transition-colors'}>
-                  <td className={`px-6 py-4 font-bold border-r sticky left-0 z-20 shadow-[2px_0_0_0_rgba(0,0,0,0.05)] ${isMe ? 'bg-emerald-100/50 text-emerald-900' : 'bg-white'}`}>
-                    {member.name} {isMe && ' (คุณ)'}
-                  </td>
-                  {TASKS.map((task) => {
-                    const isChecked = !!dailyProgress[member.id]?.[task.id];
-                    return (
-                      <td key={task.id} className="px-2 py-4 text-center">
-                        <button
-                          onClick={() => !isLocked && (activeMemberId ? onToggle(currentDate, member.id, task.id) : onOpenSelector())}
-                          disabled={isLocked}
-                          className={`w-10 h-10 mx-auto rounded-lg border flex items-center justify-center transition-all ${
-                            isChecked ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' : 'border-slate-200 bg-white'
-                          } ${isLocked ? 'opacity-20 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}
-                        >
-                          {isChecked && <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>}
-                        </button>
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      {/* Desktop View: Modern High-End Table */}
+      <div className="hidden lg:block overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.05)] rounded-[3rem] border border-emerald-100 bg-white">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left border-collapse">
+            <thead>
+              <tr className="bg-[#062e1e] text-white">
+                <th className="px-8 py-6 font-black border-b border-emerald-800 sticky left-0 z-40 bg-[#062e1e] uppercase tracking-widest text-[10px]">รายชื่อสมาชิก</th>
+                {TASKS.map(task => (
+                  <th key={task.id} className="px-2 py-6 text-center border-b border-emerald-800 min-w-[100px]">
+                    <div className="text-[9px] text-emerald-400 font-black uppercase tracking-widest mb-1">{task.category}</div>
+                    <div className="text-sm font-black">{task.label}</div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-emerald-50">
+              {MEMBERS.map((member) => {
+                const isMe = member.id === activeMemberId;
+                const isInteractionDisabled = !isMe && activeMemberId !== null;
+                const memberData = dailyProgress[member.id] || {};
+
+                return (
+                  <tr key={member.id} className={`transition-all ${isMe ? 'bg-emerald-50/30' : 'hover:bg-slate-50/50'}`}>
+                    <td className={`px-8 py-5 sticky left-0 z-20 shadow-[10px_0_15px_-5px_rgba(0,0,0,0.02)] ${
+                      isMe ? 'bg-emerald-50 text-emerald-900' : 'bg-white text-slate-700'
+                    }`}>
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-3 h-3 rounded-full ${isMe ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]' : 'bg-slate-200'}`}></div>
+                          <div className="flex flex-col">
+                            <span className="font-black text-lg tracking-tight">{isMe && '📍 '}{member.name}</span>
+                            {isMe && <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Active Identity</span>}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    {TASKS.map((task) => {
+                      const isChecked = !!memberData[task.id];
+                      return (
+                        <td key={task.id} className={`p-2 text-center`}>
+                          <button
+                            onClick={() => {
+                              if (activeMemberId === null) onOpenSelector();
+                              else if (isMe) onToggle(currentDate, member.id, task.id);
+                            }}
+                            disabled={isInteractionDisabled}
+                            className={`w-full aspect-square max-h-16 rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-300 ${
+                              isChecked 
+                                ? 'bg-gradient-to-br from-emerald-500 to-teal-600 border-transparent text-white shadow-lg shadow-emerald-200 scale-95' 
+                                : 'border-slate-100 bg-white hover:border-emerald-200'
+                            } ${isInteractionDisabled ? 'opacity-10 grayscale cursor-not-allowed' : 'hover:scale-[0.97] active:scale-90'}`}
+                          >
+                            {isChecked ? (
+                              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" />
+                              </svg>
+                            ) : (
+                              <div className="w-2 h-2 rounded-full bg-slate-200"></div>
+                            )}
+                          </button>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {activeMemberId === null && (
-        <button 
-          onClick={onOpenSelector}
-          className="w-full p-4 bg-amber-50 rounded-2xl border-2 border-dashed border-amber-200 text-amber-900 font-bold animate-pulse text-center text-sm"
-        >
-          👇 เลือกชื่อของคุณเพื่อเริ่มบันทึกความดี 👇
-        </button>
+        <div className="p-8 bg-amber-500 text-white rounded-[2.5rem] flex flex-col items-center gap-4 shadow-2xl shadow-amber-200 animate-bounce-subtle mt-10">
+          <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center text-3xl">👤</div>
+          <div className="text-center">
+            <p className="font-black text-xl mb-1">กรุณาระบุตัวตนก่อนใช้งาน!</p>
+            <p className="text-amber-100 text-sm font-medium">เลือกชื่อของคุณเพื่อเริ่มบันทึกความดีในวันนี้</p>
+          </div>
+          <button 
+            onClick={onOpenSelector}
+            className="px-10 py-4 bg-white text-amber-600 font-black rounded-2xl shadow-xl hover:bg-amber-50 transition-all active:scale-95"
+          >
+            เลือกชื่อของฉัน
+          </button>
+        </div>
       )}
     </div>
   );

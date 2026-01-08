@@ -17,7 +17,6 @@ export async function fetchProgressFromSheets(): Promise<ProgressData | null> {
   if (!SCRIPT_URL || SCRIPT_URL.includes('XXXXX')) return null;
   
   try {
-    // เพิ่ม timestamp เพื่อป้องกัน cache
     const response = await fetch(`${SCRIPT_URL}?t=${Date.now()}`);
     if (!response.ok) throw new Error('Network response was not ok');
     const rawData = await response.json();
@@ -39,10 +38,11 @@ export async function syncProgressToSheets(date: string, memberId: string, taskI
   if (!SCRIPT_URL || SCRIPT_URL.includes('XXXXX')) return false;
 
   try {
+    // ใช้ text/plain เพื่อเลี่ยงปัญหา CORS กับ Google Apps Script
     await fetch(SCRIPT_URL, {
       method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
+      mode: 'no-cors', 
+      headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify({ date, memberId, taskId, status }),
     });
     return true;

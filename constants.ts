@@ -13,11 +13,11 @@ export const MEMBERS: Member[] = [
 ];
 
 export const TASKS: Task[] = [
-  { id: 't1', label: 'ซุบฮิ (ญามาอะห์)', category: 'prayer' },
-  { id: 't2', label: 'ซุฮฺรี (ญามาอะห์)', category: 'prayer' },
-  { id: 't3', label: 'อัสรี (ญามาอะห์)', category: 'prayer' },
-  { id: 't4', label: 'มัฆริบ (ญามาอะห์)', category: 'prayer' },
-  { id: 't5', label: 'อีชา (ญามาอะห์)', category: 'prayer' },
+  { id: 't1', label: 'ซุบฮิ', category: 'prayer' },
+  { id: 't2', label: 'ซุฮฺรี', category: 'prayer' },
+  { id: 't3', label: 'อัสรี', category: 'prayer' },
+  { id: 't4', label: 'มัฆริบ', category: 'prayer' },
+  { id: 't5', label: 'อีชา', category: 'prayer' },
   { id: 't6', label: 'อัลกุรอาน', category: 'devotion' },
   { id: 't7', label: 'อัซการ เช้า-เย็น', category: 'devotion' },
   { id: 't8', label: 'ละมาดสุนัต/ตะฮัจญุด', category: 'prayer' },

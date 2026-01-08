@@ -1,21 +1,19 @@
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ChecklistTable from './components/ChecklistTable';
 import StatsPanel from './components/StatsPanel';
 import MemberSelector from './components/MemberSelector';
 import LeaderSummaryModal from './components/LeaderSummaryModal';
-import { ProgressData, DailyReflection, Member, SyncStatus } from './types';
-import { MEMBERS, TASKS } from './constants';
+import { ProgressData, DailyReflection, Member } from './types';
 import { getDailyMotivation } from './services/geminiService';
 import { syncProgressToSheets, fetchProgressFromSheets } from './services/sheetService';
 
 const App: React.FC = () => {
   const [currentDate, setCurrentDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [activeMember, setActiveMember] = useState<Member | null>(() => {
-    const saved = localStorage.getItem('active_member');
-    return saved ? JSON.parse(saved) : null;
-  });
-  const [showMemberSelector, setShowMemberSelector] = useState(!activeMember);
+  
+  // บังคับให้เลือกชื่อใหม่ทุกครั้งที่เข้าเว็บ (เริ่มที่ null เสมอ)
+  const [activeMember, setActiveMember] = useState<Member | null>(null);
+  const [showMemberSelector, setShowMemberSelector] = useState(true);
   
   const [progress, setProgress] = useState<ProgressData>(() => {
     const saved = localStorage.getItem('deen_tracker_v1');
@@ -27,104 +25,100 @@ const App: React.FC = () => {
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
-  // ตัวแปรเก็บสถานะการกด เพื่อป้องกันการถูกข้อมูลเก่าทับขณะรอเน็ต
-  const pendingMap = useRef<Map<string, boolean>>(new Map());
+  const pendingUpdates = useRef<Record<string, { value: boolean, timestamp: number }>>({});
 
-  const loadGlobalData = useCallback(async () => {
+  const loadGlobalData = useCallback(async (isSilent = false) => {
+    if (!isSilent) setSyncStatus('syncing');
     try {
       const remoteData = await fetchProgressFromSheets();
       if (remoteData) {
         setProgress(prev => {
-          const merged = { ...remoteData };
-          
-          // ตรวจสอบข้อมูลที่กำลัง Sync ค้างอยู่
-          pendingMap.current.forEach((val, key) => {
-            const [date, mId, tId] = key.split('|');
-            if (date === currentDate) {
-              if (!merged[date]) merged[date] = {};
-              if (!merged[date][mId]) merged[date][mId] = {};
-              merged[date][mId][tId] = val;
+          const newState = { ...remoteData };
+          const now = Date.now();
+          Object.entries(pendingUpdates.current).forEach(([key, update]) => {
+            if (now - update.timestamp < 30000) {
+              const [date, mId, tId] = key.split('|');
+              if (!newState[date]) newState[date] = {};
+              if (!newState[date][mId]) newState[date][mId] = {};
+              newState[date][mId][tId] = update.value;
+            } else {
+              delete pendingUpdates.current[key];
             }
           });
-
-          localStorage.setItem('deen_tracker_v1', JSON.stringify(merged));
-          return merged;
+          localStorage.setItem('deen_tracker_v1', JSON.stringify(newState));
+          return newState;
         });
+        if (!isSilent) setSyncStatus('success');
       }
     } catch (err) {
-      console.error("Fetch error:", err);
+      console.error("Sync error:", err);
+      if (!isSilent) setSyncStatus('error');
     } finally {
       setIsInitialLoading(false);
+      setTimeout(() => setSyncStatus('idle'), 2000);
     }
-  }, [currentDate]);
+  }, []);
 
-  // ดึงข้อมูลอัตโนมัติทุก 10 วินาทีเพื่อความเรียลไทม์
   useEffect(() => {
-    loadGlobalData();
-    const interval = setInterval(loadGlobalData, 10000);
+    loadGlobalData(true);
+    const interval = setInterval(() => loadGlobalData(true), 10000);
     return () => clearInterval(interval);
   }, [loadGlobalData]);
 
   const handleToggle = useCallback(async (date: string, memberId: string, taskId: string) => {
     if (!activeMember || activeMember.id !== memberId) return;
-
-    let targetValue = false;
-    setProgress(prev => {
-      targetValue = !(prev[date]?.[memberId]?.[taskId]);
-      return prev;
-    });
-
     const syncKey = `${date}|${memberId}|${taskId}`;
-    pendingMap.current.set(syncKey, targetValue);
-
-    // อัปเดตหน้าจอทันที
+    let newValue = false;
     setProgress(prev => {
+      const currentValue = !!prev[date]?.[memberId]?.[taskId];
+      newValue = !currentValue;
+      pendingUpdates.current[syncKey] = { value: newValue, timestamp: Date.now() };
       const updated = { ...prev };
       if (!updated[date]) updated[date] = {};
       if (!updated[date][memberId]) updated[date][memberId] = {};
-      updated[date][memberId][taskId] = targetValue;
+      updated[date][memberId][taskId] = newValue;
+      localStorage.setItem('deen_tracker_v1', JSON.stringify(updated));
       return updated;
     });
-
     setSyncStatus('syncing');
     try {
-      const success = await syncProgressToSheets(date, memberId, taskId, targetValue);
-      setSyncStatus(success ? 'success' : 'error');
+      const success = await syncProgressToSheets(date, memberId, taskId, newValue);
+      if (success) setSyncStatus('success');
+      else setSyncStatus('error');
     } catch (error) {
       setSyncStatus('error');
     } finally {
-      // หลังจาก 5 วินาทีค่อยลบออกจาก Pending เพื่อให้แน่ใจว่าค่าจาก Server อัปเดตทัน
-      setTimeout(() => {
-        pendingMap.current.delete(syncKey);
-      }, 5000);
       setTimeout(() => setSyncStatus('idle'), 2000);
     }
   }, [activeMember]);
 
-  // ดึงคำคมเฉพาะตอนเปิดหน้าเว็บหรือเปลี่ยนวัน
   useEffect(() => {
     const fetchReflection = async () => {
       setReflection(null);
-      const res = await getDailyMotivation(`Date: ${currentDate}`);
+      const res = await getDailyMotivation(`Context: ${currentDate}`);
       setReflection(res);
     };
     fetchReflection();
   }, [currentDate]);
 
+  const handleMemberSelect = (m: Member) => {
+    setActiveMember(m);
+    setShowMemberSelector(false);
+  };
+
   return (
-    <div className="min-h-screen bg-[#f8fafc] pb-24 font-['Anuphan']">
+    <div className="min-h-screen bg-[#f1f5f1] pb-20 font-['Anuphan'] selection:bg-emerald-200">
       {isInitialLoading && (
-        <div className="fixed inset-0 z-[100] bg-emerald-900 flex flex-col items-center justify-center text-white">
-          <div className="w-12 h-12 border-4 border-emerald-400 border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="font-bold">กำลังซิงค์ข้อมูลล่าสุดจากเพื่อนในกลุ่ม...</p>
+        <div className="fixed inset-0 z-[300] bg-emerald-950 flex flex-col items-center justify-center text-white">
+          <div className="w-14 h-14 border-4 border-emerald-400 border-t-transparent rounded-full animate-spin mb-6"></div>
+          <p className="font-bold text-lg tracking-widest uppercase">DeenTracker</p>
         </div>
       )}
 
       {showMemberSelector && (
         <MemberSelector 
-          onSelect={(m) => { setActiveMember(m); setShowMemberSelector(false); }} 
+          onSelect={handleMemberSelect} 
           onLeaderAccess={() => { setShowMemberSelector(false); setShowLeaderSummary(true); }}
-          onClose={() => setShowMemberSelector(false)}
         />
       )}
       
@@ -132,65 +126,66 @@ const App: React.FC = () => {
         <LeaderSummaryModal currentDate={currentDate} progress={progress} onClose={() => setShowLeaderSummary(false)} />
       )}
 
-      {/* ปรับขนาด Header ให้กะทัดรัดขึ้น (pt-8 pb-16 แทน pt-12 pb-24) */}
-      <header className="bg-emerald-900 text-white px-6 pt-8 pb-16 shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-800 rounded-full -mr-20 -mt-20 blur-3xl opacity-50"></div>
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 relative z-10">
+      <header className="bg-[#062e1e] text-white px-4 py-4 shadow-xl sticky top-0 z-[50] border-b border-emerald-800">
+        <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-xl bg-emerald-700 flex items-center justify-center text-xl shadow-inner">🕌</div>
-            <div>
-              <h1 className="text-2xl font-black tracking-tight leading-none mb-1">DeenTracker</h1>
-              <p className="text-[10px] text-emerald-300 uppercase tracking-widest font-bold">บันทึกความดีประจำวัน</p>
+            <div className="w-10 h-10 bg-emerald-800/50 rounded-xl flex items-center justify-center border border-emerald-700">🕌</div>
+            <div className="flex flex-col">
+              <h1 className="text-xl sm:text-2xl font-black tracking-tighter leading-none">DEENTRACKER</h1>
+              <p className="text-[8px] sm:text-[9px] text-emerald-400 font-bold uppercase tracking-widest mt-0.5">
+                {syncStatus === 'syncing' ? 'กำลังบันทึก...' : 
+                 syncStatus === 'success' ? 'บันทึกแล้ว' : 
+                 syncStatus === 'error' ? 'ข้อผิดพลาด' : 'Community Sync'}
+              </p>
             </div>
           </div>
           
-          <div className="flex flex-wrap justify-center items-center gap-2">
+          <div className="flex flex-col items-end gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+            <input 
+              type="date" 
+              value={currentDate}
+              onChange={(e) => setCurrentDate(e.target.value)}
+              className="bg-emerald-900 text-white text-[10px] sm:text-[11px] font-bold py-1 px-2 rounded-lg border border-emerald-700 outline-none focus:ring-2 ring-emerald-500 w-28 sm:w-auto"
+            />
             {activeMember && (
               <button 
                 onClick={() => setShowMemberSelector(true)}
-                className="bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border border-white/10"
+                className="bg-amber-500 hover:bg-amber-600 text-white text-[9px] sm:text-[10px] font-black px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg shadow-[0_4px_12px_rgba(245,158,11,0.3)] transition-all active:scale-95 flex items-center gap-1"
               >
-                {activeMember.name}
+                <span>👤</span>
+                <span>เปลี่ยนคน</span>
               </button>
             )}
-            <div className="bg-white/10 px-3 py-1 rounded-lg border border-white/10">
-              <input 
-                type="date" 
-                value={currentDate}
-                onChange={(e) => setCurrentDate(e.target.value)}
-                className="bg-transparent text-white text-sm font-bold outline-none cursor-pointer"
-              />
-            </div>
-            <div className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase flex items-center gap-1.5 ${
-              syncStatus === 'syncing' ? 'bg-amber-400 text-amber-950 animate-pulse' : 
-              syncStatus === 'success' ? 'bg-emerald-400 text-emerald-950' : 'bg-white/5 text-white/40'
-            }`}>
-              {syncStatus === 'syncing' ? 'Saving...' : syncStatus === 'success' ? 'Saved' : 'Online'}
-            </div>
           </div>
         </div>
       </header>
 
-      {/* ปรับระยะขยับขึ้น (-mt-10) ให้เนื้อหาไม่ไปทับส่วน Title มากเกินไป */}
-      <main className="max-w-6xl mx-auto px-4 -mt-10 space-y-6 relative z-20">
-        <section className="bg-white p-5 md:p-8 rounded-[2rem] shadow-xl border border-slate-100 min-h-[100px] flex items-center">
-          <div className="w-full">
-            {reflection ? (
-              <div className="animate-in fade-in duration-700">
-                <p className="text-lg md:text-2xl font-black text-slate-800 mb-2 leading-tight">"{reflection.quote}"</p>
-                <div className="flex items-center gap-3">
-                  <span className="text-emerald-600 font-bold text-xs md:text-sm tracking-widest">{reflection.reference}</span>
-                  <div className="h-[2px] flex-grow bg-slate-50"></div>
-                </div>
-                <p className="mt-2 text-slate-500 text-xs md:text-sm font-medium leading-relaxed">{reflection.message}</p>
+      <main className="max-w-6xl mx-auto px-4 pt-6 space-y-6">
+        <section className="bg-white/80 backdrop-blur-md p-6 rounded-[2.5rem] shadow-sm border border-emerald-100 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-full -mr-10 -mt-10 blur-3xl opacity-60"></div>
+          {reflection ? (
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-700 relative z-10">
+              <div className="flex justify-between items-start gap-4 mb-2">
+                <p className="text-lg md:text-2xl font-black text-slate-800 leading-tight">"{reflection.quote}"</p>
+                {activeMember && (
+                   <div className="flex flex-col items-end flex-shrink-0">
+                      <span className="text-[9px] font-black text-emerald-600/60 uppercase tracking-tighter">เข้าใช้โดย</span>
+                      <span className="text-emerald-900 font-black text-base">{activeMember.name}</span>
+                   </div>
+                )}
               </div>
-            ) : (
-              <div className="animate-pulse flex flex-col gap-3">
-                <div className="h-6 bg-slate-100 rounded-full w-3/4"></div>
-                <div className="h-3 bg-slate-100 rounded-full w-1/2"></div>
+              <div className="flex items-center gap-3">
+                <span className="text-emerald-600 font-black text-[11px] uppercase tracking-[0.2em]">{reflection.reference}</span>
+                <div className="h-[2px] flex-grow bg-emerald-50/50 rounded-full"></div>
               </div>
-            )}
-          </div>
+              <p className="mt-2 text-slate-500 text-xs font-medium leading-relaxed italic">{reflection.message}</p>
+            </div>
+          ) : (
+            <div className="animate-pulse space-y-2">
+              <div className="h-6 bg-emerald-50 rounded-full w-3/4"></div>
+              <div className="h-3 bg-emerald-50 rounded-full w-1/2"></div>
+            </div>
+          )}
         </section>
 
         <ChecklistTable 
