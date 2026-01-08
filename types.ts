@@ -25,3 +25,11 @@ export interface AppState {
   currentMemberId: string | null;
   currentDate: string;
 }
+
+export interface MonthlyMemberStats {
+  memberId: string;
+  memberName: string;
+  totalCompleted: number;
+  totalPossible: number;
+  percentage: number;
+}
