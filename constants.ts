@@ -19,8 +19,8 @@ export const TASKS: Task[] = [
   { id: 't4', label: 'มัฆริบ (ญามาอะห์)', category: 'prayer' },
   { id: 't5', label: 'อีชา (ญามาอะห์)', category: 'prayer' },
   { id: 't6', label: 'อัลกุรอาน', category: 'devotion' },
-  { id: 't7', label: 'อัซการ', category: 'devotion' },
-  { id: 't8', label: 'อ่านหนังสือ 15 นาที', category: 'action' },
+  { id: 't7', label: 'อัซการ เช้า-เย็น', category: 'devotion' },
+  { id: 't8', label: 'ละมาดสุนัต/ตะฮัจญุด', category: 'prayer' },
   { id: 't9', label: 'อิสติฆฟัร 100 ครั้ง', category: 'devotion' },
-  { id: 't10', label: 'บริจาค', category: 'action' },
+  { id: 't10', label: 'ความดีอื่นๆ/บริจาค', category: 'action' },
 ];

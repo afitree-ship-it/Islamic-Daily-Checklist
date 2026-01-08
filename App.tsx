@@ -78,7 +78,7 @@ const App: React.FC = () => {
       const mData = dayData[m.id] || {};
       total += Object.values(mData).filter(v => v).length;
     });
-    return `Today's group score is ${total} out of ${MEMBERS.length * TASKS.length}.`;
+    return `Today's score: ${total}/${MEMBERS.length * TASKS.length}. The group needs motivation to keep their prayers, especially Subuh in congregation.`;
   }, [progress, currentDate]);
 
   const fetchReflection = async () => {
@@ -89,7 +89,7 @@ const App: React.FC = () => {
       setReflection(res);
     } catch (e: any) {
       console.error(e);
-      setApiError(e.message || "เกิดข้อผิดพลาดในการเรียก AI");
+      setApiError(e.message || "กำลังรอการเชื่อมต่อกับ AI...");
     } finally {
       setIsRefreshingReflection(false);
     }
@@ -101,20 +101,20 @@ const App: React.FC = () => {
 
   const copyProgressToClipboard = () => {
     const dayData = progress[currentDate] || {};
-    let text = `📊 รายงานความคืบหน้า (${currentDate})\n\n`;
+    let text = `📊 รายงานความคืบหน้า DeenTracker (${currentDate})\n\n`;
     MEMBERS.forEach(m => {
       const mData = dayData[m.id] || {};
       const completed = Object.values(mData).filter(v => v).length;
-      const emoji = completed === TASKS.length ? '✅' : completed > 0 ? '🕒' : '⭕';
+      const emoji = completed === TASKS.length ? '🌟' : completed >= 5 ? '✅' : completed > 0 ? '🕒' : '⭕';
       text += `${emoji} ${m.name}: ${completed}/${TASKS.length}\n`;
     });
-    text += `\nรักษาความดีกันต่อไป อินชาอัลลอฮฺ!`;
+    text += `\nรักษาความดีกันต่อไป อินชาอัลลอฮฺ!\nCheck at: ${window.location.origin}`;
     navigator.clipboard.writeText(text);
-    alert('คัดลอกรายงานไปยังคลิปบอร์ดแล้ว!');
+    alert('คัดลอกรายงานเรียบร้อยแล้ว!');
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 pb-20">
+    <div className="min-h-screen bg-[#fcfdfe] pb-20 selection:bg-emerald-100">
       {showMemberSelector && (
         <MemberSelector 
           onSelect={(m) => {
@@ -137,104 +137,100 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* Header */}
-      <header className="bg-emerald-800 text-white pt-10 pb-24 px-6 relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-          <svg className="w-64 h-64" viewBox="0 0 24 24" fill="currentColor">
+      {/* Modern Header */}
+      <header className="bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-900 text-white pt-12 pb-28 px-6 relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
+          <svg className="w-96 h-96" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12,2L4.5,20.29L5.21,21L12,18L18.79,21L19.5,20.29L12,2Z" />
           </svg>
         </div>
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center backdrop-blur-md">
-                <span className="text-3xl">🕌</span>
+        
+        <div className="max-w-6xl mx-auto flex flex-col lg:flex-row justify-between items-center gap-8 relative z-10">
+          <div className="flex items-center gap-5">
+            <div className="w-20 h-20 rounded-[2rem] bg-white/10 flex items-center justify-center backdrop-blur-xl border border-white/20 shadow-2xl rotate-3">
+                <span className="text-4xl">🕌</span>
             </div>
             <div>
-                <h1 className="text-4xl font-black tracking-tight mb-1">DeenTracker</h1>
+                <h1 className="text-5xl font-black tracking-tighter mb-1 bg-clip-text text-transparent bg-gradient-to-r from-white to-emerald-200">DeenTracker</h1>
                 {activeMember ? (
-                  <div className="flex items-center gap-2 text-emerald-200">
-                    <span className="text-sm">คุณล็อกอินเป็น: </span>
-                    <span className="font-bold text-white bg-emerald-700 px-2 py-0.5 rounded text-sm">{activeMember.name}</span>
+                  <div className="flex items-center gap-2 text-emerald-100/80">
+                    <span className="text-sm font-medium">ยินดีต้อนรับ:</span>
+                    <span className="font-bold text-white bg-emerald-500/30 px-3 py-0.5 rounded-full text-sm border border-white/10">{activeMember.name}</span>
                     <button 
                       onClick={() => setShowMemberSelector(true)}
-                      className="text-xs underline hover:text-white ml-2 transition-colors"
+                      className="text-xs underline hover:text-white ml-2 transition-all opacity-70 hover:opacity-100"
                     >
-                      (เปลี่ยนบัญชี)
+                      (เปลี่ยนชื่อ)
                     </button>
                   </div>
                 ) : (
                   <button 
                     onClick={() => setShowMemberSelector(true)}
-                    className="mt-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/20 text-white px-4 py-1.5 rounded-full text-sm font-bold transition-all flex items-center gap-2 shadow-lg active:scale-95 animate-bounce"
+                    className="mt-2 bg-emerald-400 text-emerald-950 px-6 py-2 rounded-full text-sm font-black transition-all flex items-center gap-2 shadow-xl hover:bg-white hover:scale-105 active:scale-95 animate-pulse"
                   >
-                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                    คลิกเพื่อระบุตัวตนของคุณ
+                    ระบุตัวตนของคุณที่นี่
                   </button>
                 )}
             </div>
           </div>
           
-          <div className="flex items-center gap-3">
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
-              syncStatus === 'syncing' ? 'bg-amber-100 text-amber-700' :
-              syncStatus === 'success' ? 'bg-emerald-100 text-emerald-700' :
-              syncStatus === 'error' ? 'bg-red-100 text-red-700' : 'bg-emerald-900/40 text-emerald-300'
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <div className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-black transition-all backdrop-blur-md border ${
+              syncStatus === 'syncing' ? 'bg-amber-400/20 text-amber-300 border-amber-400/30' :
+              syncStatus === 'success' ? 'bg-emerald-400/20 text-emerald-300 border-emerald-400/30' :
+              syncStatus === 'error' ? 'bg-red-400/20 text-red-300 border-red-400/30' : 'bg-white/10 text-emerald-200 border-white/10'
             }`}>
-              <svg className={`w-4 h-4 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v8" />
-              </svg>
-              {syncStatus === 'syncing' ? 'บันทึก...' : 
-               syncStatus === 'success' ? 'ออนไลน์' : 
-               syncStatus === 'error' ? 'ผิดพลาด' : 'Cloud Sync'}
+              <div className={`w-2 h-2 rounded-full ${syncStatus === 'syncing' ? 'bg-amber-400 animate-ping' : syncStatus === 'success' ? 'bg-emerald-400' : 'bg-emerald-800'}`}></div>
+              {syncStatus === 'syncing' ? 'กำลังบันทึก...' : 
+               syncStatus === 'success' ? 'เชื่อมต่อแล้ว' : 
+               syncStatus === 'error' ? 'มีข้อผิดพลาด' : 'ระบบคลาวด์'}
             </div>
 
-            <div className="bg-emerald-700/50 p-2 rounded-xl border border-emerald-600/50 flex items-center shadow-lg backdrop-blur-sm">
+            <div className="bg-white/10 p-1.5 rounded-2xl border border-white/10 flex items-center shadow-2xl backdrop-blur-xl">
               <input 
                 type="date" 
                 value={currentDate}
                 onChange={(e) => setCurrentDate(e.target.value)}
-                className="bg-transparent text-white font-bold px-4 py-2 outline-none cursor-pointer"
+                className="bg-transparent text-white font-black px-4 py-2 outline-none cursor-pointer text-center"
               />
             </div>
           </div>
         </div>
       </header>
 
-      {/* Content */}
-      <main className="max-w-6xl mx-auto px-4 -mt-16 relative z-10 space-y-8">
+      {/* Main Content Area */}
+      <main className="max-w-6xl mx-auto px-4 -mt-16 relative z-10 space-y-10">
         
-        {/* Reflection Card */}
-        <section className="bg-white p-6 md:p-8 rounded-3xl shadow-xl border border-emerald-100 flex flex-col md:flex-row gap-8 items-center min-h-[160px]">
-            <div className="flex-shrink-0 w-20 h-20 bg-emerald-100 rounded-2xl flex items-center justify-center">
-                <svg className="w-10 h-10 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        {/* Inspiration Card */}
+        <section className="bg-white/80 backdrop-blur-md p-8 md:p-10 rounded-[2.5rem] shadow-2xl shadow-emerald-900/5 border border-white flex flex-col md:flex-row gap-10 items-center transition-all hover:shadow-emerald-900/10">
+            <div className="flex-shrink-0 w-24 h-24 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-3xl flex items-center justify-center shadow-lg rotate-6">
+                <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
             </div>
-            <div className="flex-grow text-center md:text-left w-full">
+            <div className="flex-grow text-center md:text-left">
                 {apiError ? (
-                  <div className="space-y-2">
-                    <p className="text-slate-500 font-medium italic">"{apiError}"</p>
-                    <button onClick={fetchReflection} className="text-emerald-600 text-sm font-bold hover:underline">ลองใหม่อีกครั้ง</button>
+                  <div className="space-y-3">
+                    <p className="text-slate-400 font-medium italic">"{apiError}"</p>
+                    <button onClick={fetchReflection} className="bg-emerald-100 text-emerald-700 px-4 py-1.5 rounded-full text-xs font-bold hover:bg-emerald-200 transition-colors">ลองโหลดใหม่</button>
                   </div>
                 ) : reflection ? (
-                    <>
-                        <blockquote className="text-xl font-serif italic text-slate-800 mb-2 leading-relaxed">
+                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        <blockquote className="text-2xl font-serif italic text-slate-800 mb-3 leading-tight tracking-tight">
                             "{reflection.quote}"
                         </blockquote>
-                        <div className="flex flex-col md:flex-row md:items-center gap-2 mb-3">
-                            <span className="text-emerald-600 font-black">— {reflection.reference}</span>
+                        <div className="flex flex-col md:flex-row md:items-center gap-3 mb-4">
+                            <span className="text-emerald-600 font-black text-lg tracking-widest uppercase">— {reflection.reference}</span>
                         </div>
-                        <p className="text-slate-600 text-sm leading-relaxed bg-slate-50 p-4 rounded-xl border-l-4 border-emerald-500 italic">
+                        <div className="bg-emerald-50/50 p-5 rounded-2xl border-l-8 border-emerald-500 italic text-slate-600 leading-relaxed shadow-inner">
                             {reflection.message}
-                        </p>
-                    </>
+                        </div>
+                    </div>
                 ) : (
-                    <div className="animate-pulse space-y-2">
-                        <div className="h-4 bg-slate-200 rounded w-3/4 mx-auto md:mx-0"></div>
-                        <div className="h-4 bg-slate-200 rounded w-1/2 mx-auto md:mx-0"></div>
+                    <div className="animate-pulse space-y-3">
+                        <div className="h-8 bg-slate-100 rounded-xl w-full"></div>
+                        <div className="h-8 bg-slate-100 rounded-xl w-3/4"></div>
+                        <div className="h-20 bg-slate-50 rounded-xl w-full mt-4"></div>
                     </div>
                 )}
             </div>
@@ -242,55 +238,66 @@ const App: React.FC = () => {
               <button 
                   onClick={fetchReflection}
                   disabled={isRefreshingReflection}
-                  className="flex-shrink-0 p-3 hover:bg-slate-100 rounded-2xl transition-all"
-                  title="ขอแรงบันดาลใจใหม่"
+                  className="flex-shrink-0 p-4 bg-slate-50 hover:bg-emerald-50 rounded-full transition-all hover:rotate-180 duration-500 border border-slate-100"
+                  title="เปลี่ยนแรงบันดาลใจ"
               >
-                  <svg className={`w-6 h-6 text-slate-400 ${isRefreshingReflection ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className={`w-6 h-6 text-emerald-500 ${isRefreshingReflection ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
               </button>
             )}
         </section>
 
-        {/* Action Bar */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-                <h2 className="text-2xl font-black text-slate-800 flex items-center gap-2">
-                    <span className="p-2 bg-emerald-500 rounded-lg text-white text-xs uppercase">Goal</span>
-                    เช็คลิสต์ประจำวัน
+        {/* Action Header */}
+        <div className="flex flex-col lg:flex-row justify-between items-end gap-6">
+            <div className="w-full lg:w-auto">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-black uppercase tracking-widest mb-3">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Daily Goal
+                </div>
+                <h2 className="text-4xl font-black text-slate-900 tracking-tighter">
+                    เช็คลิสต์ความดีประจำวัน
                 </h2>
-                <p className="text-slate-500 text-sm italic">
+                <p className="text-slate-500 mt-1 font-medium italic">
                   {activeMember 
-                    ? `สวัสดีคุณ ${activeMember.name}, คุณสามารถบันทึกกิจกรรมในแถวของคุณได้เท่านั้น` 
-                    : 'ระบุตัวตนของคุณเพื่อเริ่มการบันทึกกิจกรรม'}
+                    ? `สวัสดีคุณ ${activeMember.name} จิตใจที่มุ่งมั่นคือจุดเริ่มต้นของความสำเร็จ` 
+                    : 'กรุณาระบุตัวตนของคุณเพื่อเริ่มการบันทึก'}
                 </p>
             </div>
-            <div className="flex flex-wrap gap-3 w-full sm:w-auto">
+            <div className="flex flex-wrap gap-4 w-full lg:w-auto">
                 <button 
                     onClick={() => setShowLeaderSummary(true)}
-                    className="flex-1 sm:flex-none bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 px-6 rounded-2xl shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95"
+                    className="flex-1 lg:flex-none bg-white hover:bg-slate-50 text-slate-900 border border-slate-200 font-black py-4 px-8 rounded-3xl shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95"
                 >
-                    สรุปกลุ่ม
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    รายงานกลุ่ม
                 </button>
                 <button 
                     onClick={copyProgressToClipboard}
-                    className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-2xl shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95"
+                    className="flex-1 lg:flex-none bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 px-8 rounded-3xl shadow-xl shadow-emerald-200 flex items-center justify-center gap-3 transition-all active:scale-95"
                 >
-                    คัดลอกรายงาน
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4l-2 2m0 0l-2-2m2 2v-5" />
+                    </svg>
+                    แชร์รายงาน
                 </button>
             </div>
         </div>
 
-        {/* Main Table */}
-        <ChecklistTable 
-            currentDate={currentDate} 
-            progress={progress} 
-            activeMemberId={activeMember?.id || null}
-            onToggle={handleToggle}
-            onOpenSelector={() => setShowMemberSelector(true)}
-        />
+        {/* Dynamic Checklist Table */}
+        <div className="transform transition-all">
+          <ChecklistTable 
+              currentDate={currentDate} 
+              progress={progress} 
+              activeMemberId={activeMember?.id || null}
+              onToggle={handleToggle}
+              onOpenSelector={() => setShowMemberSelector(true)}
+          />
+        </div>
 
-        {/* Stats Section */}
+        {/* Stats and Analytics */}
         <StatsPanel 
             currentDate={currentDate} 
             progress={progress} 
@@ -298,9 +305,14 @@ const App: React.FC = () => {
 
       </main>
 
-      <footer className="mt-20 text-center text-slate-400 text-sm pb-10">
-          <p>© 2024 DeenTracker - สร้างเพื่อสังคม</p>
-          <p className="mt-1">"จดบันทึกความดี เพื่อโลกนี้และโลกหน้า"</p>
+      <footer className="mt-24 text-center pb-12">
+          <div className="inline-flex items-center gap-3 px-6 py-2 bg-slate-100 rounded-full text-slate-400 text-xs font-bold mb-4">
+            <span>Powered by Vercel & Gemini AI</span>
+            <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+            <span>DeenTracker v1.2</span>
+          </div>
+          <p className="text-slate-400 font-medium">© 2024 DeenTracker - พัฒนาเพื่อสังคมมุสลิม</p>
+          <p className="text-emerald-600/50 text-sm mt-1">"ความสม่ำเสมอ คือหัวใจของการขัดเกลาจิตใจ"</p>
       </footer>
     </div>
   );
