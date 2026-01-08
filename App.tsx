@@ -17,59 +17,70 @@ const App: React.FC = () => {
   const [showCelebration, setShowCelebration] = useState(false);
   const [hasCelebratedToday, setHasCelebratedToday] = useState<Record<string, boolean>>({});
 
-  const [progress, setProgress] = useState<ProgressData>(() => {
-    const saved = localStorage.getItem('deen_tracker_v1');
-    return saved ? JSON.parse(saved) : {};
-  });
+  // ใช้ Ref เป็น Master Data ที่เข้าถึงได้ทันที (ป้องกัน State เก่ามาทับ)
+  // แก้ไขการกำหนดค่าเริ่มต้นของ useRef ให้ถูกต้องเพื่อป้องกันข้อผิดพลาด Expected 1 arguments, but got 2.
+  const progressRef = useRef<ProgressData>(
+    JSON.parse(localStorage.getItem('deen_tracker_v1') || '{}')
+  );
+
+  const [progress, setProgressState] = useState<ProgressData>(progressRef.current);
   
   const [syncQueue, setSyncQueue] = useState<SyncQueueItem[]>(() => {
     const savedQueue = localStorage.getItem('deen_sync_queue');
     return savedQueue ? JSON.parse(savedQueue) : [];
   });
 
+  // ป้องกัน Race Condition ระหว่าง Local และ Remote
   const localInteractions = useRef<Record<string, number>>({});
   const isProcessingQueue = useRef(false);
   const debounceTimerRef = useRef<number | null>(null);
-  const [lastUpdatedText, setLastUpdatedText] = useState<string>('เชื่อมต่อแล้ว');
+  const [lastUpdatedText, setLastUpdatedText] = useState<string>('พร้อมใช้งาน');
 
   const [reflection, setReflection] = useState<DailyReflection | null>(null);
   const [showLeaderSummary, setShowLeaderSummary] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error' | 'offline'>('idle');
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
-  useEffect(() => {
-    localStorage.setItem('deen_tracker_v1', JSON.stringify(progress));
-  }, [progress]);
-
+  // บันทึก Queue ลง localStorage สม่ำเสมอ
   useEffect(() => {
     localStorage.setItem('deen_sync_queue', JSON.stringify(syncQueue));
   }, [syncQueue]);
 
+  // ฟังก์ชันผสานข้อมูลจาก Server โดยเคารพข้อมูลที่เพิ่งกดล่าสุด (Grace Period)
   const mergeProgress = useCallback((remote: ProgressData) => {
     const now = Date.now();
-    const GRACE_PERIOD = 3000; 
+    const GRACE_PERIOD = 20000; // 20 วินาที เพื่อความชัวร์ว่า Google Sheets ทันอัปเดต
 
-    setProgress(prev => {
-      const next = { ...prev };
-      Object.keys(remote).forEach(date => {
-        if (!next[date]) next[date] = {};
-        Object.keys(remote[date]).forEach(mId => {
-          if (!next[date][mId]) next[date][mId] = {};
-          Object.keys(remote[date][mId]).forEach(tId => {
-            const interactionKey = `${date}|${mId}|${tId}`;
-            const hasInQueue = syncQueue.some(q => `${q.date}|${q.memberId}|${q.taskId}` === interactionKey);
-            const lastTouch = localInteractions.current[interactionKey] || 0;
-            
-            if (!hasInQueue && (now - lastTouch > GRACE_PERIOD)) {
-              next[date][mId][tId] = remote[date][mId][tId];
+    let hasChanged = false;
+    const nextLocal = { ...progressRef.current };
+
+    Object.keys(remote).forEach(date => {
+      if (!nextLocal[date]) nextLocal[date] = {};
+      Object.keys(remote[date]).forEach(mId => {
+        if (!nextLocal[date][mId]) nextLocal[date][mId] = {};
+        Object.keys(remote[date][mId]).forEach(tId => {
+          const interactionKey = `${date}|${mId}|${tId}`;
+          const lastTouch = localInteractions.current[interactionKey] || 0;
+          
+          // ถ้าเพิ่งกดไปไม่เกิน 20 วินาที ห้ามเอาค่าจาก Server มาทับเด็ดขาด
+          if (now - lastTouch > GRACE_PERIOD) {
+            if (nextLocal[date][mId][tId] !== remote[date][mId][tId]) {
+              nextLocal[date] = { ...nextLocal[date], [mId]: { ...nextLocal[date][mId], [tId]: remote[date][mId][tId] } };
+              hasChanged = true;
             }
-          });
+          }
         });
       });
-      return { ...next };
     });
-    setLastUpdatedText(`ซิงค์ล่าสุด ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}`);
-  }, [syncQueue]);
+
+    if (hasChanged) {
+      progressRef.current = nextLocal;
+      localStorage.setItem('deen_tracker_v1', JSON.stringify(nextLocal));
+      setProgressState({ ...nextLocal });
+    }
+    
+    setLastUpdatedText(`อัปเดตล่าสุด: ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}`);
+  }, []);
 
   const loadGlobalData = useCallback(async (isSilent = false) => {
     if (!isSilent) setSyncStatus('syncing');
@@ -93,17 +104,17 @@ const App: React.FC = () => {
     isProcessingQueue.current = true;
     setSyncStatus('syncing');
     
-    // ดึงข้อมูลล่าสุดของแต่ละงานในคิว (ป้องกันการส่งซ้ำถ้ากดรัวๆ)
-    const uniqueTasks = new Map<string, SyncQueueItem>();
+    // ดึงเฉพาะรายการล่าสุดต่อ 1 Task เพื่อลดจำนวนการเขียน
+    const latestItemsMap = new Map<string, SyncQueueItem>();
     syncQueue.forEach(item => {
       const key = `${item.date}|${item.memberId}|${item.taskId}`;
-      if (!uniqueTasks.has(key) || item.timestamp > uniqueTasks.get(key)!.timestamp) {
-        uniqueTasks.set(key, item);
+      if (!latestItemsMap.has(key) || item.timestamp > latestItemsMap.get(key)!.timestamp) {
+        latestItemsMap.set(key, item);
       }
     });
 
-    const itemsToSync = Array.from(uniqueTasks.values());
-    const currentQueueIds = itemsToSync.map(i => i.id);
+    const itemsToSync = Array.from(latestItemsMap.values());
+    const queueIdsToRemove = itemsToSync.map(i => i.id);
     
     try {
       const success = await syncBatchToSheets(itemsToSync.map(i => ({
@@ -114,10 +125,10 @@ const App: React.FC = () => {
       })));
 
       if (success) {
-        setSyncQueue(prev => prev.filter(q => !currentQueueIds.includes(q.id)));
+        setSyncQueue(prev => prev.filter(q => !queueIdsToRemove.includes(q.id)));
         setSyncStatus('success');
-        // ดึงข้อมูลรวมใหม่แบบเงียบๆ
-        setTimeout(() => loadGlobalData(true), 1000);
+        // ทิ้งช่วง 3 วินาทีให้ Server บันทึกเสร็จแล้วค่อยดึงกลับมาใหม่
+        setTimeout(() => loadGlobalData(true), 3000);
       } else {
         setSyncStatus('error');
       }
@@ -125,17 +136,17 @@ const App: React.FC = () => {
       setSyncStatus('error');
     } finally {
       isProcessingQueue.current = false;
-      setTimeout(() => setSyncStatus('idle'), 1500);
+      setTimeout(() => setSyncStatus('idle'), 1000);
     }
   }, [syncQueue, loadGlobalData]);
 
-  // ระบบ Auto-fire: ส่งข้อมูลทันทีเมื่อหยุดกด
+  // Debounce การซิงค์เพื่อรวบรวมการกดรัวๆ
   useEffect(() => {
-    if (syncQueue.length > 0) {
+    if (syncQueue.length > 0 && !isProcessingQueue.current) {
       if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = window.setTimeout(() => {
         processQueue();
-      }, 800); // รอ 0.8 วินาทีหลังจากกดครั้งสุดท้ายแล้วส่งทันที
+      }, 2000); 
     }
     return () => {
       if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
@@ -146,63 +157,73 @@ const App: React.FC = () => {
     loadGlobalData();
     const interval = setInterval(() => {
       if (syncQueue.length === 0 && !isProcessingQueue.current) loadGlobalData(true);
-    }, 30000); 
+    }, 60000); 
     return () => clearInterval(interval);
   }, [loadGlobalData, syncQueue.length]);
 
   const handleToggle = useCallback((date: string, memberId: string, taskId: string) => {
+    // ป้องกันการกดถ้าไม่ได้เลือกชื่อตนเอง
     if (!activeMember || activeMember.id !== memberId) return;
 
     const interactionKey = `${date}|${memberId}|${taskId}`;
-    const currentValue = !!progress[date]?.[memberId]?.[taskId];
-    const newValue = !currentValue;
-    
     localInteractions.current[interactionKey] = Date.now();
 
-    // 1. Update UI ทันที (Optimistic)
-    setProgress(prev => ({
-      ...prev,
-      [date]: {
-        ...(prev[date] || {}),
-        [memberId]: {
-          ...(prev[date]?.[memberId] || {}),
-          [taskId]: newValue
+    // ทำงานแบบ Optimistic (เปลี่ยนทันทีใน UI)
+    setProgressState(prev => {
+      const currentValue = !!(prev[date]?.[memberId]?.[taskId]);
+      const newValue = !currentValue;
+
+      // อัปเดต RefMaster เพื่อให้ Sync logic ใช้ค่าใหม่ล่าสุดเสมอ
+      const nextProgress = {
+        ...prev,
+        [date]: {
+          ...(prev[date] || {}),
+          [memberId]: {
+            ...(prev[date]?.[memberId] || {}),
+            [taskId]: newValue
+          }
+        }
+      };
+      progressRef.current = nextProgress;
+      localStorage.setItem('deen_tracker_v1', JSON.stringify(nextProgress));
+
+      // เพิ่มเข้าคิวส่งข้อมูล
+      const newItem: SyncQueueItem = {
+        id: `${Date.now()}-${Math.random()}`,
+        date,
+        memberId,
+        taskId,
+        status: newValue,
+        timestamp: Date.now()
+      };
+      setSyncQueue(q => [...q, newItem]);
+
+      // ตรวจสอบความสำเร็จ 10/10
+      if (newValue === true) {
+        const memberData = nextProgress[date][memberId];
+        const completedCount = Object.keys(memberData).filter(tId => memberData[tId]).length;
+        if (completedCount === TASKS.length) {
+          const userCelebrationKey = `${date}-${memberId}`;
+          if (!hasCelebratedToday[userCelebrationKey]) {
+            setTimeout(() => setShowCelebration(true), 600);
+            setHasCelebratedToday(h => ({ ...h, [userCelebrationKey]: true }));
+          }
         }
       }
-    }));
 
-    // เช็ค Celebration
-    const currentMemberData = progress[date]?.[memberId] || {};
-    const willBeCompletedCount = Object.keys(currentMemberData).filter(tId => tId !== taskId && currentMemberData[tId]).length + (newValue ? 1 : 0);
-    const userCelebrationKey = `${date}-${memberId}`;
-    if (willBeCompletedCount === TASKS.length && !currentValue && !hasCelebratedToday[userCelebrationKey]) {
-      setShowCelebration(true);
-      setHasCelebratedToday(prev => ({ ...prev, [userCelebrationKey]: true }));
-    }
-
-    // 2. เพิ่มเข้าคิวรอส่งเบื้องหลัง
-    const newItem: SyncQueueItem = {
-      id: `${Date.now()}-${interactionKey}`,
-      date,
-      memberId,
-      taskId,
-      status: newValue,
-      timestamp: Date.now()
-    };
-    
-    setSyncQueue(prev => [...prev, newItem]);
-  }, [activeMember, progress, hasCelebratedToday]);
+      return nextProgress;
+    });
+  }, [activeMember, hasCelebratedToday]);
 
   useEffect(() => {
     let isMounted = true;
     const fetchReflection = async () => {
-      const summary = JSON.stringify(progress[currentDate] || {});
-      const res = await getDailyMotivation(`วันที่: ${currentDate}, ข้อมูล: ${summary}`);
+      const res = await getDailyMotivation(`วันที่: ${currentDate}`);
       if (isMounted) setReflection(res);
     };
     fetchReflection();
     return () => { isMounted = false; };
-  }, [currentDate, JSON.stringify(progress[currentDate] || {})]);
+  }, [currentDate]);
 
   const handleMemberSelect = (m: Member) => {
     setActiveMember(m);
@@ -210,7 +231,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] pb-24 font-['Anuphan'] selection:bg-emerald-200">
+    <div className="min-h-screen bg-[#f8fafc] pb-24 font-['Anuphan'] selection:bg-emerald-200 no-select">
       {isInitialLoading && (
         <div className="fixed inset-0 z-[1000] bg-emerald-950 flex flex-col items-center justify-center text-white">
           <div className="w-12 h-12 border-4 border-emerald-400 border-t-transparent rounded-full animate-spin mb-6"></div>
@@ -242,7 +263,6 @@ const App: React.FC = () => {
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                 <polyline points="22 4 12 14.01 9 11.01" strokeWidth="3" className="text-white" />
               </svg>
-              {/* แถบสถานะซิงค์เล็กๆ ใต้อิมเมจ */}
               {syncStatus === 'syncing' && (
                 <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-amber-400 rounded-full border-2 border-emerald-950 animate-pulse"></div>
               )}
@@ -254,7 +274,7 @@ const App: React.FC = () => {
               </p>
               <div className="flex items-center gap-1.5 mt-1.5">
                 <p className="text-[8px] font-bold uppercase tracking-widest text-emerald-400/60">
-                  {syncStatus === 'syncing' ? 'กำลังบันทึกเบื้องหลัง...' : lastUpdatedText}
+                  {syncStatus === 'syncing' ? 'กำลังบันทึก...' : lastUpdatedText}
                 </p>
               </div>
             </div>
@@ -263,13 +283,12 @@ const App: React.FC = () => {
           <div className="flex items-center gap-2">
             <button 
               onClick={() => loadGlobalData()}
-              className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-colors border border-white/5 active:scale-90"
+              className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-colors border border-white/5 active:scale-95"
             >
               <svg className={`w-5 h-5 ${syncStatus === 'syncing' ? 'animate-spin opacity-50' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357-2H15" /></svg>
             </button>
           </div>
         </div>
-        {/* Progress bar แบบบางเฉียบใต้ Header ขณะส่งข้อมูล */}
         <div className={`absolute bottom-0 left-0 h-[2px] bg-emerald-400 transition-all duration-1000 ${syncStatus === 'syncing' ? 'w-full opacity-100' : 'w-0 opacity-0'}`}></div>
       </header>
 
@@ -310,7 +329,6 @@ const App: React.FC = () => {
         <StatsPanel currentDate={currentDate} progress={progress} />
       </main>
 
-      {/* ย้ายการแจ้งเตือนไปไว้ที่มุมเล็กๆ หรือซ่อนไปเลยเพื่อไม่ให้ขัดจังหวะผู้ใช้ */}
       {syncStatus === 'error' && (
         <div className="fixed bottom-6 right-6 z-[100] animate-in slide-in-from-right duration-300">
           <div className="bg-red-600 text-white px-4 py-2 rounded-xl shadow-xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest">

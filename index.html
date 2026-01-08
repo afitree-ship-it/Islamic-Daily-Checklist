@@ -3,7 +3,7 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>DeenTracker</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@100;400;700&display=swap" rel="stylesheet">
@@ -11,8 +11,25 @@
         body {
             font-family: 'Anuphan', sans-serif;
             background-color: #f8fafc;
+            touch-action: manipulation; /* ลบ 300ms delay */
+            -webkit-tap-highlight-color: transparent; /* ลบเงาสีฟ้าตอนกดบน iOS */
         }
         #root { min-height: 100vh; }
+        
+        /* ป้องกันการเลือกข้อความขณะกดปุ่มเช็คลิสต์รัวๆ */
+        .no-select {
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        
+        /* เพิ่มประสิทธิภาพการ scroll */
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
     </style>
     <script type="importmap">
 {

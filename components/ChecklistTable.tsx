@@ -1,7 +1,7 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { MEMBERS, TASKS } from '../constants';
-import { ProgressData, SyncQueueItem } from '../types';
+import { ProgressData, SyncQueueItem, Task } from '../types';
 
 interface ChecklistTableProps {
   currentDate: string;
@@ -12,6 +12,72 @@ interface ChecklistTableProps {
   onOpenSelector: () => void;
   syncQueue: SyncQueueItem[];
 }
+
+const TaskButton = React.memo(({ 
+  task, 
+  isChecked, 
+  isPending, 
+  isMe, 
+  onToggle, 
+  date, 
+  memberId,
+  isInteractionDisabled
+}: { 
+  task: Task, 
+  isChecked: boolean, 
+  isPending: boolean, 
+  isMe: boolean, 
+  onToggle: any, 
+  date: string, 
+  memberId: string,
+  isInteractionDisabled: boolean
+}) => {
+  // สร้าง Local Feedback เมื่อกด เพื่อความรู้สึกลื่นไหล
+  const [justClicked, setJustClicked] = useState(false);
+
+  const handleClick = () => {
+    if (!isMe || isInteractionDisabled) return;
+    
+    setJustClicked(true);
+    setTimeout(() => setJustClicked(false), 300);
+    onToggle(date, memberId, task.id);
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={isInteractionDisabled}
+      className={`group relative flex flex-col items-center justify-center gap-2 p-3 rounded-2xl transition-all duration-75 ${
+        isChecked 
+          ? 'bg-emerald-600 text-white shadow-md'
+          : 'bg-white border border-slate-100 text-slate-600 shadow-sm'
+      } ${isInteractionDisabled ? 'opacity-20 grayscale cursor-not-allowed' : 'active:scale-95 active:brightness-90'} ${justClicked ? 'scale-90 ring-2 ring-emerald-300' : ''}`}
+    >
+      {(isPending || justClicked) && (
+        <div className="absolute top-1.5 right-1.5">
+          <div className="w-2 h-2 bg-amber-400 rounded-full animate-pulse border border-white"></div>
+        </div>
+      )}
+      
+      <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+        isChecked ? 'bg-white/20' : 'bg-slate-50 border border-slate-100'
+      }`}>
+        {isChecked ? (
+          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" />
+          </svg>
+        ) : (
+           <div className="w-1.5 h-1.5 rounded-full bg-slate-200"></div>
+        )}
+      </div>
+      
+      <div className="text-center pointer-events-none">
+        <p className={`text-[11px] font-black leading-none mb-0.5 ${isChecked ? 'text-white' : 'text-slate-800'}`}>{task.label}</p>
+        <p className={`text-[8px] uppercase font-bold tracking-widest ${isChecked ? 'text-emerald-100' : 'text-slate-400'}`}>{task.category}</p>
+      </div>
+    </button>
+  );
+});
 
 const ChecklistTable: React.FC<ChecklistTableProps> = ({ 
   currentDate, 
@@ -26,13 +92,15 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
 
   const sortedMembers = useMemo(() => {
     if (!activeMemberId) return MEMBERS;
-    const active = MEMBERS.find(m => m.id === activeMemberId);
-    const others = MEMBERS.filter(m => m.id !== activeMemberId);
-    return active ? [active, ...others] : MEMBERS;
+    const activeIndex = MEMBERS.findIndex(m => m.id === activeMemberId);
+    if (activeIndex === -1) return MEMBERS;
+    
+    const others = [...MEMBERS];
+    const active = others.splice(activeIndex, 1)[0];
+    return [active, ...others];
   }, [activeMemberId]);
 
-  // ฟังก์ชันเช็คสถานะการซิงค์แบบเงียบๆ
-  const isPending = (memberId: string, taskId: string) => {
+  const getSyncState = (memberId: string, taskId: string) => {
     return syncQueue.some(q => q.date === currentDate && q.memberId === memberId && q.taskId === taskId);
   };
 
@@ -79,7 +147,7 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
             <div 
               key={member.id} 
               className={`rounded-[2rem] border overflow-hidden transition-all duration-300 shadow-sm bg-white ${
-                isMe ? 'border-emerald-200 ring-2 ring-emerald-500/5' : 'border-slate-100'
+                isMe ? 'border-emerald-200 ring-4 ring-emerald-500/5' : 'border-slate-100'
               }`}
             >
               <div className={`px-5 py-3 flex justify-between items-center ${isMe ? 'bg-emerald-50/50' : 'bg-slate-50/30'}`}>
@@ -95,48 +163,19 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
               </div>
               
               <div className="p-3 grid grid-cols-2 gap-2">
-                {TASKS.map((task) => {
-                  const isChecked = !!memberData[task.id];
-                  const pending = isPending(member.id, task.id);
-                  const isInteractionDisabled = !isMe && activeMemberId !== null;
-
-                  return (
-                    <button
-                      key={task.id}
-                      onClick={() => isMe && onToggle(currentDate, member.id, task.id)}
-                      disabled={isInteractionDisabled}
-                      className={`group relative flex flex-col items-center justify-center gap-2 p-3 rounded-2xl transition-all duration-150 ${
-                        isChecked 
-                          ? 'bg-emerald-600 text-white shadow-md'
-                          : 'bg-white border border-slate-100 text-slate-600'
-                      } ${isInteractionDisabled ? 'opacity-30 grayscale cursor-not-allowed' : 'active:scale-[0.97]'}`}
-                    >
-                      {/* Indicator ซิงค์แบบเงียบๆ ไม่เด้งรบกวน */}
-                      {pending && (
-                        <div className="absolute top-1 right-1">
-                          <div className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse"></div>
-                        </div>
-                      )}
-                      
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                        isChecked ? 'bg-white/20' : 'bg-slate-50 border border-slate-100'
-                      }`}>
-                        {isChecked ? (
-                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.5" d="M5 13l4 4L19 7" />
-                          </svg>
-                        ) : (
-                           <div className="w-1.5 h-1.5 rounded-full bg-slate-200"></div>
-                        )}
-                      </div>
-                      
-                      <div className="text-center">
-                        <p className={`text-[11px] font-black leading-none mb-0.5 ${isChecked ? 'text-white' : 'text-slate-800'}`}>{task.label}</p>
-                        <p className={`text-[8px] uppercase font-bold tracking-widest ${isChecked ? 'text-emerald-100' : 'text-slate-400'}`}>{task.category}</p>
-                      </div>
-                    </button>
-                  );
-                })}
+                {TASKS.map((task) => (
+                  <TaskButton
+                    key={task.id}
+                    task={task}
+                    isChecked={!!memberData[task.id]}
+                    isPending={getSyncState(member.id, task.id)}
+                    isMe={isMe}
+                    onToggle={onToggle}
+                    date={currentDate}
+                    memberId={member.id}
+                    isInteractionDisabled={!isMe && activeMemberId !== null}
+                  />
+                ))}
               </div>
             </div>
           );
@@ -173,29 +212,19 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
                     </td>
                     {TASKS.map((task) => {
                       const isChecked = !!memberData[task.id];
-                      const pending = isPending(member.id, task.id);
+                      const pending = getSyncState(member.id, task.id);
                       return (
                         <td key={task.id} className="p-2 text-center relative">
-                          <button
-                            onClick={() => isMe && onToggle(currentDate, member.id, task.id)}
-                            disabled={isInteractionDisabled}
-                            className={`w-full aspect-square max-h-16 rounded-2xl border-2 flex flex-col items-center justify-center transition-all duration-150 ${
-                              isChecked 
-                                ? 'bg-emerald-600 border-transparent text-white shadow-md' 
-                                : 'border-slate-100 bg-white hover:border-emerald-200'
-                            } ${isInteractionDisabled ? 'opacity-10 cursor-not-allowed' : 'hover:scale-[1.03] active:scale-95'}`}
-                          >
-                            {pending && (
-                              <div className="absolute top-1 right-1 w-2 h-2 bg-amber-400 rounded-full border border-white"></div>
-                            )}
-                            {isChecked ? (
-                              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" />
-                              </svg>
-                            ) : (
-                              <div className="w-1.5 h-1.5 rounded-full bg-slate-100"></div>
-                            )}
-                          </button>
+                          <TaskButton
+                            task={task}
+                            isChecked={isChecked}
+                            isPending={pending}
+                            isMe={isMe}
+                            onToggle={onToggle}
+                            date={currentDate}
+                            memberId={member.id}
+                            isInteractionDisabled={isInteractionDisabled}
+                          />
                         </td>
                       );
                     })}
