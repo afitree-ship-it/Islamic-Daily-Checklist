@@ -5,6 +5,7 @@ import { ProgressData, SyncQueueItem } from '../types';
 
 interface ChecklistTableProps {
   currentDate: string;
+  onDateChange: (date: string) => void;
   progress: ProgressData;
   activeMemberId: string | null;
   onToggle: (date: string, memberId: string, taskId: string) => void;
@@ -14,6 +15,7 @@ interface ChecklistTableProps {
 
 const ChecklistTable: React.FC<ChecklistTableProps> = ({ 
   currentDate, 
+  onDateChange,
   progress, 
   activeMemberId, 
   onToggle, 
@@ -29,27 +31,42 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
     return active ? [active, ...others] : MEMBERS;
   }, [activeMemberId]);
 
-  // ตรวจสอบว่าช่องนี้กำลังรอซิงค์อยู่หรือไม่
   const isPending = (memberId: string, taskId: string) => {
     return syncQueue.some(q => q.date === currentDate && q.memberId === memberId && q.taskId === taskId);
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center px-2">
-        <h3 className="text-xl font-black text-slate-800 flex items-center">
+      <div className="flex justify-between items-start px-2">
+        <h3 className="text-xl font-black text-slate-800 flex items-center mt-2">
           <span className="w-1.5 h-6 bg-emerald-500 rounded-full mr-3"></span>
           รายการเช็คลิสต์
         </h3>
-        <button 
-          onClick={onOpenSelector}
-          className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white text-[10px] font-black rounded-xl border border-orange-400 hover:bg-orange-600 transition-all shadow-lg shadow-orange-200 active:scale-95 uppercase tracking-widest animate-pulse hover:animate-none"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-          </svg>
-          เปลี่ยนแปลงคน
-        </button>
+        
+        <div className="flex flex-col items-end gap-2">
+          {/* ส่วนเลือกวันที่ใหม่ - ใหญ่ขึ้นและกดง่ายขึ้น */}
+          <div className="relative group">
+            <span className="absolute -top-2 right-3 bg-white px-2 text-[8px] font-black text-emerald-600 uppercase tracking-widest z-10 border border-emerald-100 rounded-full">
+              เลือกวันที่
+            </span>
+            <input 
+              type="date" 
+              value={currentDate}
+              onChange={(e) => onDateChange(e.target.value)}
+              className="bg-white text-slate-800 text-sm font-black py-3 px-4 rounded-2xl border-2 border-emerald-100 hover:border-emerald-500 transition-all outline-none shadow-sm cursor-pointer w-44"
+            />
+          </div>
+
+          <button 
+            onClick={onOpenSelector}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white text-[10px] font-black rounded-xl border border-orange-400 hover:bg-orange-600 transition-all shadow-lg shadow-orange-200 active:scale-95 uppercase tracking-widest"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            เปลี่ยนแปลงคน
+          </button>
+        </div>
       </div>
 
       {/* Mobile View */}

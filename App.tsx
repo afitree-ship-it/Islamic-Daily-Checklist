@@ -15,8 +15,6 @@ const App: React.FC = () => {
   const [activeMember, setActiveMember] = useState<Member | null>(null);
   const [showMemberSelector, setShowMemberSelector] = useState(true);
   const [showCelebration, setShowCelebration] = useState(false);
-  
-  // เก็บสถานะว่าผู้ใช้ปัจจุบันได้เห็นการฉลองของวันนี้ไปแล้วหรือยัง เพื่อไม่ให้เด้งซ้ำซ้อน
   const [hasCelebratedToday, setHasCelebratedToday] = useState<Record<string, boolean>>({});
 
   const [progress, setProgress] = useState<ProgressData>(() => {
@@ -155,11 +153,9 @@ const App: React.FC = () => {
     
     localInteractions.current[interactionKey] = Date.now();
 
-    // เช็คจำนวนที่สำเร็จหลังจากเลือก (Optimistic Update)
     const currentMemberData = progress[date]?.[memberId] || {};
     const willBeCompletedCount = Object.keys(currentMemberData).filter(tId => tId !== taskId && currentMemberData[tId]).length + (newValue ? 1 : 0);
 
-    // ฉลองเมื่อครบ 10/10 และเป็นครั้งแรกของวันนั้นๆ สำหรับสมาชิกคนนั้น
     const userCelebrationKey = `${date}-${memberId}`;
     if (willBeCompletedCount === TASKS.length && !currentValue && !hasCelebratedToday[userCelebrationKey]) {
       setShowCelebration(true);
@@ -195,12 +191,15 @@ const App: React.FC = () => {
   }, [activeMember, progress, processQueue, hasCelebratedToday]);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchReflection = async () => {
-      const res = await getDailyMotivation(`วันที่: ${currentDate}, สรุปกลุ่ม: ${JSON.stringify(progress[currentDate] || {})}`);
-      setReflection(res);
+      const summary = JSON.stringify(progress[currentDate] || {});
+      const res = await getDailyMotivation(`วันที่: ${currentDate}, ข้อมูล: ${summary}`);
+      if (isMounted) setReflection(res);
     };
     fetchReflection();
-  }, [currentDate]);
+    return () => { isMounted = false; };
+  }, [currentDate, JSON.stringify(progress[currentDate] || {})]);
 
   const handleMemberSelect = (m: Member) => {
     setActiveMember(m);
@@ -234,7 +233,12 @@ const App: React.FC = () => {
       <header className="bg-emerald-950 text-white px-4 py-4 shadow-2xl sticky top-0 z-[50] border-b border-white/5 backdrop-blur-md">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-emerald-800/40 rounded-xl flex items-center justify-center border border-white/10">🕌</div>
+            <div className="w-10 h-10 bg-emerald-800/40 rounded-xl flex items-center justify-center border border-white/10 shadow-inner">
+              <svg className="w-6 h-6 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+            </div>
             <div className="flex flex-col items-start min-w-0">
               <h1 className="text-xl font-black tracking-tighter leading-none">DEENTRACKER</h1>
               <p className="text-[5px] text-white/20 font-bold whitespace-nowrap leading-none mt-1 uppercase w-full" style={{ textAlignLast: 'justify' }}>
@@ -253,16 +257,10 @@ const App: React.FC = () => {
             <button 
               onClick={() => loadGlobalData()}
               title="Refresh Data"
-              className="p-2 bg-white/5 hover:bg-white/10 rounded-xl transition-colors border border-white/5"
+              className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-colors border border-white/5"
             >
-              <svg className={`w-4 h-4 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+              <svg className={`w-5 h-5 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
             </button>
-            <input 
-              type="date" 
-              value={currentDate}
-              onChange={(e) => setCurrentDate(e.target.value)}
-              className="bg-emerald-900/50 text-white text-[10px] font-black py-2 px-3 rounded-xl border border-white/10 outline-none w-32"
-            />
           </div>
         </div>
       </header>
@@ -284,15 +282,17 @@ const App: React.FC = () => {
               <p className="text-slate-500 text-xs font-medium italic">{reflection.message}</p>
             </div>
           ) : (
-            <div className="animate-pulse flex flex-col gap-3">
+            <div className="animate-pulse flex flex-col gap-3 py-4">
               <div className="h-6 bg-slate-100 rounded-full w-3/4"></div>
-              <div className="h-10 bg-slate-50 rounded-2xl w-full"></div>
+              <div className="h-4 bg-slate-50 rounded-full w-1/2 mt-4"></div>
+              <div className="h-10 bg-slate-50 rounded-2xl w-full mt-2"></div>
             </div>
           )}
         </section>
 
         <ChecklistTable 
           currentDate={currentDate} 
+          onDateChange={setCurrentDate}
           progress={progress} 
           activeMemberId={activeMember?.id || null}
           onToggle={handleToggle}

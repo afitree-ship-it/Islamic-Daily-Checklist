@@ -9,33 +9,39 @@ const FALLBACK_REFLECTION: DailyReflection = {
 };
 
 export async function getDailyMotivation(progressSummary: string): Promise<DailyReflection> {
-  // Always initialize GoogleGenAI with the API key from process.env.API_KEY directly.
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
+  // สร้าง Controller สำหรับทำ Timeout หาก API ตอบช้าเกิน 8 วินาที
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+
   try {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: `Based on the following group progress summary: "${progressSummary}", provide an inspiring Islamic quote (Hadith or Quran) in Thai, its reference, and a short message of encouragement for the group.`,
+      contents: `สรุปความคืบหน้ากลุ่ม: "${progressSummary}". ช่วยหาคำคมอิสลาม (อัลกุรอานหรือหะดีษ) เป็นภาษาไทย พร้อมแหล่งที่มา และข้อความให้กำลังใจสั้นๆ`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            quote: { type: Type.STRING, description: 'An inspiring Islamic quote in Thai.' },
-            reference: { type: Type.STRING, description: 'The source of the quote.' },
-            message: { type: Type.STRING, description: 'A brief encouraging message in Thai.' },
+            quote: { type: Type.STRING },
+            reference: { type: Type.STRING },
+            message: { type: Type.STRING },
           },
           required: ["quote", "reference", "message"],
         },
       },
     });
 
-    // Access the extracted string directly via the .text property (not a method).
+    clearTimeout(timeoutId);
     const text = response.text;
+    
     if (!text) return FALLBACK_REFLECTION;
+    
     return JSON.parse(text.trim());
   } catch (error: any) {
-    console.error("Gemini API Error:", error);
+    clearTimeout(timeoutId);
+    console.warn("Gemini Service Notice: Using fallback reflection due to error or timeout.");
     return FALLBACK_REFLECTION;
   }
 }
