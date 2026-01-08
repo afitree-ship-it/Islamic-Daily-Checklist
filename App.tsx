@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import ChecklistTable from './components/ChecklistTable';
 import StatsPanel from './components/StatsPanel';
 import MemberSelector from './components/MemberSelector';
@@ -27,38 +27,31 @@ const App: React.FC = () => {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const [isInitialLoading, setIsInitialLoading] = useState(true);
 
-  // ฟังก์ชันโหลดข้อมูลแบบผสาน (Merge)
-  const loadGlobalData = useCallback(async (isAutoRefresh = false) => {
-    // ถ้ากำลังบันทึกค่าใหม่ ให้ข้ามการดึงค่าจาก Sheet ชั่วคราวเพื่อป้องกันการเขียนทับ
-    if (isAutoRefresh && syncStatus === 'syncing') return;
+  // ใช้ Ref เพื่อเก็บรายการที่กำลังอยู่ระหว่างการส่ง (Pending)
+  // เพื่อไม่ให้ Background Fetch มาเขียนทับระหว่างรอ Response
+  const pendingSyncs = useRef<Set<string>>(new Set());
 
+  const loadGlobalData = useCallback(async (isAutoRefresh = false) => {
     try {
       const remoteData = await fetchProgressFromSheets();
       if (remoteData) {
         setProgress(prev => {
-          // ใช้ข้อมูลใหม่จาก Remote เป็นฐาน
-          const merged = { ...remoteData };
+          const newData = { ...remoteData };
           
-          // ตรวจสอบข้อมูลในเครื่อง (Local) เพื่อป้องกันการติ๊กหาย
-          // วนลูปเฉพาะวันที่ปัจจุบันเพื่อความรวดเร็ว
-          if (prev[currentDate]) {
-            if (!merged[currentDate]) merged[currentDate] = {};
-            
-            Object.keys(prev[currentDate]).forEach(memberId => {
-              if (!merged[currentDate][memberId]) merged[currentDate][memberId] = {};
-              
-              // ผสานข้อมูลราย Task
-              Object.keys(prev[currentDate][memberId]).forEach(taskId => {
-                // ถ้าในเครื่องเป็น true แต่ Remote เป็น false (เพราะยัง Sync ไม่ถึง) ให้ยึดเครื่องไว้ก่อน
-                if (prev[currentDate][memberId][taskId] === true) {
-                  merged[currentDate][memberId][taskId] = true;
-                }
-              });
-            });
-          }
-          
-          localStorage.setItem('deen_tracker_v1', JSON.stringify(merged));
-          return merged;
+          // ถ้ามีการดึงข้อมูลใหม่มา ให้เอาข้อมูลในเครื่องที่ "ยังซิงค์ไม่เสร็จ" ไปแปะทับ
+          // เพื่อป้องกัน UI กระโดดกลับไปค่าเก่าระหว่างรอเน็ต
+          pendingSyncs.current.forEach(key => {
+            const [date, mId, tId, valStr] = key.split('|');
+            const val = valStr === 'true';
+            if (date === currentDate) {
+              if (!newData[date]) newData[date] = {};
+              if (!newData[date][mId]) newData[date][mId] = {};
+              newData[date][mId][tId] = val;
+            }
+          });
+
+          localStorage.setItem('deen_tracker_v1', JSON.stringify(newData));
+          return newData;
         });
       }
     } catch (err) {
@@ -66,11 +59,12 @@ const App: React.FC = () => {
     } finally {
       setIsInitialLoading(false);
     }
-  }, [syncStatus, currentDate]);
+  }, [currentDate]);
 
+  // ตั้งค่าการดึงข้อมูลอัตโนมัติ (ทุก 15 วินาทีเพื่อให้ดู Real-time มากขึ้น)
   useEffect(() => {
     loadGlobalData();
-    const interval = setInterval(() => loadGlobalData(true), 30000);
+    const interval = setInterval(() => loadGlobalData(true), 15000);
     return () => clearInterval(interval);
   }, [loadGlobalData]);
 
@@ -85,11 +79,18 @@ const App: React.FC = () => {
 
     let targetValue = false;
     
-    // 1. อัปเดต UI ทันที (Optimistic Update)
+    // 1. คำนวณค่าใหม่
     setProgress(prev => {
-      const currentStatus = !!(prev[date]?.[memberId]?.[taskId]);
-      targetValue = !currentStatus;
-      
+      targetValue = !(prev[date]?.[memberId]?.[taskId]);
+      return prev;
+    });
+
+    // 2. เก็บสถานะ Pending ไว้
+    const syncKey = `${date}|${memberId}|${taskId}|${targetValue}`;
+    pendingSyncs.current.add(syncKey);
+
+    // 3. อัปเดต UI ทันที
+    setProgress(prev => {
       const updated = {
         ...prev,
         [date]: {
@@ -100,11 +101,9 @@ const App: React.FC = () => {
           }
         }
       };
-      localStorage.setItem('deen_tracker_v1', JSON.stringify(updated));
       return updated;
     });
 
-    // 2. ซิงค์กับระบบหลังบ้าน
     setSyncStatus('syncing');
     try {
       const success = await syncProgressToSheets(date, memberId, taskId, targetValue);
@@ -112,38 +111,43 @@ const App: React.FC = () => {
     } catch (error) {
       setSyncStatus('error');
     } finally {
+      // 4. เอาออกจาก Pending เมื่อส่งเสร็จ
+      pendingSyncs.current.delete(syncKey);
       setTimeout(() => setSyncStatus('idle'), 2000);
     }
   }, [activeMember]);
 
-  const progressSummaryText = useMemo(() => {
+  // คำนวณสรุปเพื่อส่งให้ AI ครั้งเดียวตอนเปลี่ยนวัน
+  const summaryForAI = useMemo(() => {
     const dayData = progress[currentDate] || {};
     let total = 0;
     MEMBERS.forEach(m => {
       const mData = dayData[m.id] || {};
       total += Object.values(mData).filter(v => v).length;
     });
-    return `Score: ${total}/${MEMBERS.length * TASKS.length} for ${currentDate}`;
-  }, [progress, currentDate]);
+    return `Progress summary: ${total} tasks completed for date ${currentDate}`;
+  }, [currentDate]); // ไม่เอา progress ใส่ใน dependency เพื่อไม่ให้เปลี่ยนตามการติ๊ก
 
+  // ดึงคำคมเฉพาะตอน "เปลี่ยนวันที่" หรือ "เปิดหน้าเว็บครั้งแรก" เท่านั้น
   useEffect(() => {
     const fetchReflection = async () => {
+      setReflection(null); // แสดง Loading ชั่วคราว
       try {
-        const res = await getDailyMotivation(progressSummaryText);
+        const res = await getDailyMotivation(summaryForAI);
         setReflection(res);
       } catch (e) {
-        // Fallback handled inside service
+        console.error(e);
       }
     };
     fetchReflection();
-  }, [currentDate, progressSummaryText]);
+  }, [currentDate]); // เปลี่ยนเฉพาะเมื่อเปลี่ยนวันที่
 
   return (
     <div className="min-h-screen bg-[#fcfdfe] pb-20 selection:bg-emerald-100 font-['Anuphan']">
       {isInitialLoading && (
         <div className="fixed inset-0 z-[100] bg-emerald-900 flex flex-col items-center justify-center text-white">
           <div className="w-16 h-16 border-4 border-emerald-400 border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="font-bold animate-pulse text-emerald-100">กำลังเชื่อมต่อฐานข้อมูลกลุ่ม...</p>
+          <p className="font-bold animate-pulse text-emerald-100">กำลังซิงค์ข้อมูลล่าสุดจากกลุ่ม...</p>
         </div>
       )}
 
@@ -178,7 +182,7 @@ const App: React.FC = () => {
                 {activeMember && (
                   <div className="flex items-center gap-2 text-emerald-100/80">
                     <span className="text-sm">ผู้ใช้งาน: <b>{activeMember.name}</b></span>
-                    <button onClick={() => setShowMemberSelector(true)} className="text-xs underline hover:text-white transition-colors">เปลี่ยนคน</button>
+                    <button onClick={() => setShowMemberSelector(true)} className="text-xs underline hover:text-white transition-colors ml-2">เปลี่ยนคน</button>
                   </div>
                 )}
             </div>
@@ -191,18 +195,18 @@ const App: React.FC = () => {
                 syncStatus === 'success' ? 'text-emerald-400' : 
                 syncStatus === 'error' ? 'text-red-400' : 'text-emerald-100/40'
               }`}>
-                {syncStatus === 'syncing' ? 'กำลังบันทึกข้อมูล...' : 
-                 syncStatus === 'success' ? 'บันทึกเรียบร้อย ✓' : 
-                 syncStatus === 'error' ? 'การซิงค์ล้มเหลว' : 'เชื่อมต่อฐานข้อมูลแล้ว'}
+                {syncStatus === 'syncing' ? 'กำลังส่งข้อมูล...' : 
+                 syncStatus === 'success' ? 'บันทึกสำเร็จ' : 
+                 syncStatus === 'error' ? 'เน็ตมีปัญหา' : 'เชื่อมต่อส่วนกลาง'}
               </span>
             </div>
             
             <button 
               onClick={() => loadGlobalData()}
               className="p-3 bg-white/10 hover:bg-white/20 rounded-xl border border-white/10 transition-all group active:scale-95"
-              title="ดึงข้อมูลใหม่"
+              title="รีเฟรชข้อมูล"
             >
-              <svg className={`w-5 h-5 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             </button>
@@ -221,7 +225,7 @@ const App: React.FC = () => {
 
       <main className="max-w-6xl mx-auto px-4 -mt-16 relative z-10 space-y-8">
         <section className="bg-white p-6 md:p-8 rounded-3xl shadow-xl border border-slate-100 min-h-[140px] flex items-center overflow-hidden relative group">
-            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+            <div className="absolute top-0 right-0 p-4 opacity-5">
               <svg className="w-24 h-24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/></svg>
             </div>
             <div className="w-full relative z-10">
