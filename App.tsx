@@ -25,6 +25,7 @@ const App: React.FC = () => {
 
   const localInteractions = useRef<Record<string, number>>({});
   const isProcessingQueue = useRef(false);
+  const [lastUpdatedText, setLastUpdatedText] = useState<string>('รอดึงข้อมูล...');
 
   const [reflection, setReflection] = useState<DailyReflection | null>(null);
   const [showLeaderSummary, setShowLeaderSummary] = useState(false);
@@ -41,30 +42,26 @@ const App: React.FC = () => {
 
   const mergeProgress = useCallback((remote: ProgressData) => {
     const now = Date.now();
-    const GRACE_PERIOD = 30000;
+    const GRACE_PERIOD = 5000; 
 
     setProgress(prev => {
       const next = { ...prev };
       Object.keys(remote).forEach(date => {
-        // สร้าง Object ใหม่สำหรับแต่ละระดับเพื่อความปลอดภัย (Immutability)
-        next[date] = { ...(next[date] || {}) };
-        
+        if (!next[date]) next[date] = {};
         Object.keys(remote[date]).forEach(mId => {
-          next[date][mId] = { ...(next[date][mId] || {}) };
-          
+          if (!next[date][mId]) next[date][mId] = {};
           Object.keys(remote[date][mId]).forEach(tId => {
             const interactionKey = `${date}|${mId}|${tId}`;
             const lastTouch = localInteractions.current[interactionKey] || 0;
-            
-            // ใช้ค่าจาก remote เฉพาะเมื่อพ้นช่วง Grace Period แล้วเท่านั้น
             if (now - lastTouch > GRACE_PERIOD) {
               next[date][mId][tId] = remote[date][mId][tId];
             }
           });
         });
       });
-      return next;
+      return { ...next };
     });
+    setLastUpdatedText(`ซิงค์ล่าสุด: ${new Date().toLocaleTimeString('th-TH')}`);
   }, []);
 
   const loadGlobalData = useCallback(async (isSilent = false) => {
@@ -74,12 +71,15 @@ const App: React.FC = () => {
       if (remoteData) {
         mergeProgress(remoteData);
         if (!isSilent) setSyncStatus('success');
+      } else {
+        if (!isSilent) setSyncStatus('error');
       }
     } catch (err) {
+      console.error("Load Global Data Error:", err);
       if (!isSilent) setSyncStatus('error');
     } finally {
       setIsInitialLoading(false);
-      setTimeout(() => setSyncStatus(prev => prev === 'syncing' ? 'idle' : prev), 2000);
+      if (!isSilent) setTimeout(() => setSyncStatus('idle'), 2000);
     }
   }, [mergeProgress]);
 
@@ -88,14 +88,12 @@ const App: React.FC = () => {
 
     isProcessingQueue.current = true;
     const currentBatch = [...syncQueue];
-    setSyncStatus('syncing');
+    currentBatch.sort((a, b) => a.timestamp - b.timestamp);
 
     const syncPromises = currentBatch.map(async (item) => {
       try {
         const success = await syncProgressToSheets(item.date, item.memberId, item.taskId, item.status);
-        if (success) {
-          return item.id;
-        }
+        if (success) return item.id;
       } catch (e) {
         console.error("Sync error for item:", item.id);
       }
@@ -107,26 +105,27 @@ const App: React.FC = () => {
 
     if (successfulIds.length > 0) {
       setSyncQueue(prev => prev.filter(q => !successfulIds.includes(q.id)));
-      setSyncStatus('success');
-    } else {
-      setSyncStatus('offline');
+      loadGlobalData(true);
     }
-
     isProcessingQueue.current = false;
-  }, [syncQueue]);
+  }, [syncQueue, loadGlobalData]);
 
   useEffect(() => {
     const interval = setInterval(() => {
       if (syncQueue.length > 0) processQueue();
-    }, 1000);
+    }, 2000);
     return () => clearInterval(interval);
   }, [syncQueue, processQueue]);
 
   useEffect(() => {
     loadGlobalData();
-    const interval = setInterval(() => loadGlobalData(true), 20000);
+    const interval = setInterval(() => {
+      if (syncQueue.length === 0) {
+        loadGlobalData(true);
+      }
+    }, 10000); // เช็คข้อมูลจากเครื่องอื่นทุก 10 วินาที
     return () => clearInterval(interval);
-  }, [loadGlobalData]);
+  }, [loadGlobalData, syncQueue.length]);
 
   const handleToggle = useCallback((date: string, memberId: string, taskId: string) => {
     if (!activeMember || activeMember.id !== memberId) return;
@@ -137,21 +136,17 @@ const App: React.FC = () => {
     
     localInteractions.current[interactionKey] = Date.now();
 
-    // 1. ตอบสนองที่หน้าจอทันทีแบบ Deep Immutability
-    setProgress(prev => {
-      return {
-        ...prev,
-        [date]: {
-          ...(prev[date] || {}),
-          [memberId]: {
-            ...(prev[date]?.[memberId] || {}),
-            [taskId]: newValue
-          }
+    setProgress(prev => ({
+      ...prev,
+      [date]: {
+        ...(prev[date] || {}),
+        [memberId]: {
+          ...(prev[date]?.[memberId] || {}),
+          [taskId]: newValue
         }
-      };
-    });
+      }
+    }));
 
-    // 2. จัดการ Queue
     const newItem: SyncQueueItem = {
       id: `${Date.now()}-${interactionKey}`,
       date,
@@ -166,7 +161,7 @@ const App: React.FC = () => {
       return [...filtered, newItem];
     });
 
-    setTimeout(processQueue, 0);
+    setTimeout(processQueue, 100);
   }, [activeMember, progress, processQueue]);
 
   useEffect(() => {
@@ -175,7 +170,7 @@ const App: React.FC = () => {
       setReflection(res);
     };
     fetchReflection();
-  }, [currentDate, activeMember]);
+  }, [currentDate]);
 
   const handleMemberSelect = (m: Member) => {
     setActiveMember(m);
@@ -187,7 +182,7 @@ const App: React.FC = () => {
       {isInitialLoading && (
         <div className="fixed inset-0 z-[1000] bg-emerald-950 flex flex-col items-center justify-center text-white">
           <div className="w-12 h-12 border-4 border-emerald-400 border-t-transparent rounded-full animate-spin mb-6"></div>
-          <p className="font-black text-sm tracking-[0.3em] uppercase opacity-50">DeenTracker Loading...</p>
+          <p className="font-black text-sm tracking-[0.3em] uppercase opacity-50">DeenTracker Syncing...</p>
         </div>
       )}
 
@@ -209,9 +204,9 @@ const App: React.FC = () => {
             <div>
               <h1 className="text-xl font-black tracking-tighter leading-none">DEENTRACKER</h1>
               <div className="flex items-center gap-2 mt-1">
-                <div className={`w-1.5 h-1.5 rounded-full ${syncQueue.length > 0 ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`}></div>
+                <div className={`w-1.5 h-1.5 rounded-full ${syncQueue.length > 0 ? 'bg-amber-400 animate-pulse' : (syncStatus === 'error' ? 'bg-red-500' : 'bg-emerald-400')}`}></div>
                 <p className="text-[8px] font-bold uppercase tracking-widest text-emerald-400">
-                  {syncQueue.length > 0 ? `รอนำส่ง ${syncQueue.length} รายการ...` : 'เชื่อมต่อเซิร์ฟเวอร์แล้ว'}
+                  {syncQueue.length > 0 ? `กำลังบันทึก ${syncQueue.length} รายการ...` : lastUpdatedText}
                 </p>
               </div>
             </div>
@@ -220,6 +215,7 @@ const App: React.FC = () => {
           <div className="flex items-center gap-2">
             <button 
               onClick={() => loadGlobalData()}
+              title="Refresh Data"
               className="p-2 bg-white/5 hover:bg-white/10 rounded-xl transition-colors border border-white/5"
             >
               <svg className={`w-4 h-4 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>

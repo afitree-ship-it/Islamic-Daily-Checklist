@@ -1,7 +1,8 @@
 
 import { ProgressData } from '../types';
 
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxlD_uU8N2Z3AysSQwckvdB6-Y48eX-zFIatQWDpUPd6_OvyyA0EjHhGwIoUuTuJ9sw/exec'; 
+// อัปเดตเป็นลิงก์ใหม่ที่คุณได้รับจากการ Deploy
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbytdKyLpZkavKGJX_g7oGhqjR4IxcUgjfG5rUuStVhmgIg7vwpv6ojVbfl4m0CGPkpF/exec'; 
 
 const formatDateKey = (dateInput: any): string => {
   try {
@@ -17,10 +18,16 @@ export async function fetchProgressFromSheets(): Promise<ProgressData | null> {
   if (!SCRIPT_URL || SCRIPT_URL.includes('XXXXX')) return null;
   
   try {
-    const response = await fetch(`${SCRIPT_URL}?t=${Date.now()}`);
+    const response = await fetch(`${SCRIPT_URL}?t=${Date.now()}`, {
+      method: 'GET',
+      cache: 'no-store'
+    });
+    
     if (!response.ok) throw new Error('Network response was not ok');
     const rawData = await response.json();
     
+    if (!rawData || typeof rawData !== 'object') return null;
+
     const sanitizedData: ProgressData = {};
     Object.keys(rawData).forEach(dateKey => {
       const cleanDate = formatDateKey(dateKey);
@@ -38,7 +45,6 @@ export async function syncProgressToSheets(date: string, memberId: string, taskI
   if (!SCRIPT_URL || SCRIPT_URL.includes('XXXXX')) return false;
 
   try {
-    // ใช้ text/plain เพื่อเลี่ยงปัญหา CORS กับ Google Apps Script
     await fetch(SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors', 
