@@ -19,11 +19,15 @@ export interface DailyReflection {
   message: string;
 }
 
-export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
+export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error' | 'offline';
 
-export interface AppState {
-  currentMemberId: string | null;
-  currentDate: string;
+export interface SyncQueueItem {
+  id: string;
+  date: string;
+  memberId: string;
+  taskId: string;
+  status: boolean;
+  timestamp: number;
 }
 
 export interface MonthlyMemberStats {
