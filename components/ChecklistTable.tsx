@@ -22,7 +22,6 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
 }) => {
   const dailyProgress = progress[currentDate] || {};
 
-  // จัดลำดับสมาชิกใหม่: ให้คนที่ถูกเลือก (activeMemberId) อยู่บนสุด
   const sortedMembers = useMemo(() => {
     if (!activeMemberId) return MEMBERS;
     const active = MEMBERS.find(m => m.id === activeMemberId);
@@ -30,13 +29,13 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
     return active ? [active, ...others] : MEMBERS;
   }, [activeMemberId]);
 
+  // ตรวจสอบว่าช่องนี้กำลังรอซิงค์อยู่หรือไม่
   const isPending = (memberId: string, taskId: string) => {
     return syncQueue.some(q => q.date === currentDate && q.memberId === memberId && q.taskId === taskId);
   };
 
   return (
     <div className="space-y-6">
-      {/* Header Section with Change User Button */}
       <div className="flex justify-between items-center px-2">
         <h3 className="text-xl font-black text-slate-800 flex items-center">
           <span className="w-1.5 h-6 bg-emerald-500 rounded-full mr-3"></span>
@@ -97,21 +96,23 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
                         isChecked 
                           ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg'
                           : 'bg-white border border-slate-100 text-slate-600'
-                      } ${isInteractionDisabled ? 'opacity-40 grayscale' : 'active:scale-95'}`}
+                      } ${isInteractionDisabled ? 'opacity-40 grayscale' : 'active:scale-95'} ${pending ? 'animate-pulse' : ''}`}
                     >
                       {pending && (
-                        <div className="absolute top-2 right-2 w-2 h-2 bg-amber-400 rounded-full animate-ping"></div>
+                        <div className="absolute top-2 right-2 flex items-center justify-center">
+                          <div className="w-2 h-2 bg-amber-400 rounded-full animate-ping"></div>
+                        </div>
                       )}
                       
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
                         isChecked ? 'bg-white/20' : 'bg-slate-50 border border-slate-200'
                       }`}>
                         {isChecked ? (
-                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className={`w-5 h-5 text-white ${pending ? 'animate-bounce' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3.5" d="M5 13l4 4L19 7" />
                           </svg>
                         ) : (
-                           <div className="w-1.5 h-1.5 rounded-full bg-slate-300"></div>
+                           <div className={`w-1.5 h-1.5 rounded-full ${pending ? 'bg-amber-400' : 'bg-slate-300'}`}></div>
                         )}
                       </div>
                       
@@ -172,17 +173,17 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
                               isChecked 
                                 ? 'bg-gradient-to-br from-emerald-500 to-teal-600 border-transparent text-white shadow-lg scale-95' 
                                 : 'border-slate-100 bg-white hover:border-emerald-200'
-                            } ${isInteractionDisabled ? 'opacity-10 cursor-not-allowed' : 'hover:scale-105'}`}
+                            } ${isInteractionDisabled ? 'opacity-10 cursor-not-allowed' : 'hover:scale-105'} ${pending ? 'animate-pulse scale-90' : ''}`}
                           >
                             {pending && (
-                              <div className="absolute top-1 right-1 w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
+                              <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-amber-500 rounded-full border-2 border-white animate-bounce shadow-sm"></div>
                             )}
                             {isChecked ? (
                               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" />
                               </svg>
                             ) : (
-                              <div className="w-2 h-2 rounded-full bg-slate-200"></div>
+                              <div className={`w-2 h-2 rounded-full ${pending ? 'bg-amber-400' : 'bg-slate-200'}`}></div>
                             )}
                           </button>
                         </td>

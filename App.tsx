@@ -6,7 +6,7 @@ import MemberSelector from './components/MemberSelector';
 import LeaderSummaryModal from './components/LeaderSummaryModal';
 import { ProgressData, DailyReflection, Member, SyncQueueItem } from './types';
 import { getDailyMotivation } from './services/geminiService';
-import { syncProgressToSheets, fetchProgressFromSheets } from './services/sheetService';
+import { fetchProgressFromSheets, syncBatchToSheets } from './services/sheetService';
 
 const App: React.FC = () => {
   const [currentDate, setCurrentDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -25,6 +25,7 @@ const App: React.FC = () => {
 
   const localInteractions = useRef<Record<string, number>>({});
   const isProcessingQueue = useRef(false);
+  const queueTimeoutRef = useRef<number | null>(null);
   const [lastUpdatedText, setLastUpdatedText] = useState<string>('รอดึงข้อมูล...');
 
   const [reflection, setReflection] = useState<DailyReflection | null>(null);
@@ -52,8 +53,10 @@ const App: React.FC = () => {
           if (!next[date][mId]) next[date][mId] = {};
           Object.keys(remote[date][mId]).forEach(tId => {
             const interactionKey = `${date}|${mId}|${tId}`;
+            const hasInQueue = syncQueue.some(q => `${q.date}|${q.memberId}|${q.taskId}` === interactionKey);
             const lastTouch = localInteractions.current[interactionKey] || 0;
-            if (now - lastTouch > GRACE_PERIOD) {
+            
+            if (!hasInQueue && (now - lastTouch > GRACE_PERIOD)) {
               next[date][mId][tId] = remote[date][mId][tId];
             }
           });
@@ -62,7 +65,7 @@ const App: React.FC = () => {
       return { ...next };
     });
     setLastUpdatedText(`ซิงค์ล่าสุด: ${new Date().toLocaleTimeString('th-TH')}`);
-  }, []);
+  }, [syncQueue]);
 
   const loadGlobalData = useCallback(async (isSilent = false) => {
     if (!isSilent) setSyncStatus('syncing');
@@ -87,43 +90,55 @@ const App: React.FC = () => {
     if (syncQueue.length === 0 || !navigator.onLine || isProcessingQueue.current) return;
 
     isProcessingQueue.current = true;
-    const currentBatch = [...syncQueue];
-    currentBatch.sort((a, b) => a.timestamp - b.timestamp);
-
-    const syncPromises = currentBatch.map(async (item) => {
-      try {
-        const success = await syncProgressToSheets(item.date, item.memberId, item.taskId, item.status);
-        if (success) return item.id;
-      } catch (e) {
-        console.error("Sync error for item:", item.id);
+    setSyncStatus('syncing');
+    
+    // 1. จัดกลุ่มและ Deduplicate
+    const uniqueTasks = new Map<string, SyncQueueItem>();
+    syncQueue.forEach(item => {
+      const key = `${item.date}|${item.memberId}|${item.taskId}`;
+      if (!uniqueTasks.has(key) || item.timestamp > uniqueTasks.get(key)!.timestamp) {
+        uniqueTasks.set(key, item);
       }
-      return null;
     });
 
-    const results = await Promise.all(syncPromises);
-    const successfulIds = results.filter(id => id !== null);
+    const itemsToSync = Array.from(uniqueTasks.values());
+    
+    try {
+      const success = await syncBatchToSheets(itemsToSync.map(i => ({
+        date: i.date,
+        memberId: i.memberId,
+        taskId: i.taskId,
+        status: i.status
+      })));
 
-    if (successfulIds.length > 0) {
-      setSyncQueue(prev => prev.filter(q => !successfulIds.includes(q.id)));
-      loadGlobalData(true);
+      if (success) {
+        const processedTimestamp = Math.max(...itemsToSync.map(i => i.timestamp));
+        setSyncQueue(prev => prev.filter(q => q.timestamp > processedTimestamp));
+        setSyncStatus('success');
+        // ลด Delay ในการดึงข้อมูลกลับมาเช็คจาก 1000ms เหลือ 300ms
+        setTimeout(() => loadGlobalData(true), 300);
+      } else {
+        setSyncStatus('error');
+      }
+    } catch (e) {
+      console.error("Batch sync failed:", e);
+      setSyncStatus('error');
+    } finally {
+      isProcessingQueue.current = false;
+      setTimeout(() => setSyncStatus('idle'), 2000);
     }
-    isProcessingQueue.current = false;
   }, [syncQueue, loadGlobalData]);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (syncQueue.length > 0) processQueue();
-    }, 2000);
+    const interval = setInterval(processQueue, 5000);
     return () => clearInterval(interval);
-  }, [syncQueue, processQueue]);
+  }, [processQueue]);
 
   useEffect(() => {
     loadGlobalData();
     const interval = setInterval(() => {
-      if (syncQueue.length === 0) {
-        loadGlobalData(true);
-      }
-    }, 10000); // เช็คข้อมูลจากเครื่องอื่นทุก 10 วินาที
+      if (syncQueue.length === 0) loadGlobalData(true);
+    }, 25000); 
     return () => clearInterval(interval);
   }, [loadGlobalData, syncQueue.length]);
 
@@ -156,12 +171,13 @@ const App: React.FC = () => {
       timestamp: Date.now()
     };
     
-    setSyncQueue(prev => {
-      const filtered = prev.filter(q => `${q.date}|${q.memberId}|${q.taskId}` !== interactionKey);
-      return [...filtered, newItem];
-    });
+    setSyncQueue(prev => [...prev, newItem]);
 
-    setTimeout(processQueue, 100);
+    // ปรับ Debounce ให้สั้นลงเหลือ 200ms เพื่อความรู้สึกที่ "ทันใจ" ขึ้น
+    if (queueTimeoutRef.current) clearTimeout(queueTimeoutRef.current);
+    queueTimeoutRef.current = window.setTimeout(() => {
+      processQueue();
+    }, 200);
   }, [activeMember, progress, processQueue]);
 
   useEffect(() => {
@@ -206,7 +222,7 @@ const App: React.FC = () => {
               <div className="flex items-center gap-2 mt-1">
                 <div className={`w-1.5 h-1.5 rounded-full ${syncQueue.length > 0 ? 'bg-amber-400 animate-pulse' : (syncStatus === 'error' ? 'bg-red-500' : 'bg-emerald-400')}`}></div>
                 <p className="text-[8px] font-bold uppercase tracking-widest text-emerald-400">
-                  {syncQueue.length > 0 ? `กำลังบันทึก ${syncQueue.length} รายการ...` : lastUpdatedText}
+                  {syncQueue.length > 0 ? `กำลังส่งข้อมูล ${syncQueue.length} รายการ...` : lastUpdatedText}
                 </p>
               </div>
             </div>
@@ -268,7 +284,7 @@ const App: React.FC = () => {
 
       {syncQueue.length > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100]">
-          <div className="bg-amber-500 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 text-xs font-black uppercase tracking-widest shadow-amber-200/50 border border-amber-400/50">
+          <div className="bg-emerald-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 text-xs font-black uppercase tracking-widest shadow-emerald-200/50 border border-emerald-400/50">
             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
             กำลังบันทึก {syncQueue.length} รายการ...
           </div>

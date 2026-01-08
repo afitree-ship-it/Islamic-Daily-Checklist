@@ -1,8 +1,8 @@
 
 import { ProgressData } from '../types';
 
-// อัปเดตเป็นลิงก์ใหม่ที่คุณได้รับจากการ Deploy
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbytdKyLpZkavKGJX_g7oGhqjR4IxcUgjfG5rUuStVhmgIg7vwpv6ojVbfl4m0CGPkpF/exec'; 
+// อัปเดตเป็นลิงก์ล่าสุดที่ได้รับ
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxO5U99nteeyh2_-2mLmfJjfkqj7Rc2I62XbaaDbkpYgyJpzSeD3Fdo5N6NmKbCMsVW/exec'; 
 
 const formatDateKey = (dateInput: any): string => {
   try {
@@ -41,19 +41,22 @@ export async function fetchProgressFromSheets(): Promise<ProgressData | null> {
   }
 }
 
-export async function syncProgressToSheets(date: string, memberId: string, taskId: string, status: boolean): Promise<boolean> {
-  if (!SCRIPT_URL || SCRIPT_URL.includes('XXXXX')) return false;
+// ปรับปรุง Batch Sync ให้ส่งข้อมูลแบบ Text/Plain เพื่อเลี่ยง CORS Preflight ที่ทำให้ช้า
+export async function syncBatchToSheets(items: {date: string, memberId: string, taskId: string, status: boolean}[]): Promise<boolean> {
+  if (!SCRIPT_URL || SCRIPT_URL.includes('XXXXX') || items.length === 0) return false;
 
   try {
+    // ใช้ no-cors เพื่อความเร็วสูงสุดในการยิง Request ออกไป
+    // Google Script จะได้รับข้อมูลเป็น string ใน e.postData.contents
     await fetch(SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors', 
       headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ date, memberId, taskId, status }),
+      body: JSON.stringify(items),
     });
     return true;
   } catch (error) {
-    console.error("Failed to sync to Google Sheets:", error);
+    console.error("Failed to batch sync to Google Sheets:", error);
     return false;
   }
 }
