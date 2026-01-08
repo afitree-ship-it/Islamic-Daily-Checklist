@@ -40,7 +40,7 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
       <div className="flex justify-between items-start px-2">
         <h3 className="text-xl font-black text-slate-800 flex items-center mt-2">
           <span className="w-1.5 h-6 bg-emerald-500 rounded-full mr-3"></span>
-          รายการเช็คลิสต์
+          เช็คลิสต์
         </h3>
         
         <div className="flex flex-col items-end gap-2">
