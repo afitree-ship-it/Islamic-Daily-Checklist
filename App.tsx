@@ -4,15 +4,21 @@ import ChecklistTable from './components/ChecklistTable';
 import StatsPanel from './components/StatsPanel';
 import MemberSelector from './components/MemberSelector';
 import LeaderSummaryModal from './components/LeaderSummaryModal';
+import CelebrationModal from './components/CelebrationModal';
 import { ProgressData, DailyReflection, Member, SyncQueueItem } from './types';
 import { getDailyMotivation } from './services/geminiService';
 import { fetchProgressFromSheets, syncBatchToSheets } from './services/sheetService';
+import { TASKS } from './constants';
 
 const App: React.FC = () => {
   const [currentDate, setCurrentDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [activeMember, setActiveMember] = useState<Member | null>(null);
   const [showMemberSelector, setShowMemberSelector] = useState(true);
+  const [showCelebration, setShowCelebration] = useState(false);
   
+  // เก็บสถานะว่าผู้ใช้ปัจจุบันได้เห็นการฉลองของวันนี้ไปแล้วหรือยัง เพื่อไม่ให้เด้งซ้ำซ้อน
+  const [hasCelebratedToday, setHasCelebratedToday] = useState<Record<string, boolean>>({});
+
   const [progress, setProgress] = useState<ProgressData>(() => {
     const saved = localStorage.getItem('deen_tracker_v1');
     return saved ? JSON.parse(saved) : {};
@@ -92,7 +98,6 @@ const App: React.FC = () => {
     isProcessingQueue.current = true;
     setSyncStatus('syncing');
     
-    // 1. จัดกลุ่มและ Deduplicate
     const uniqueTasks = new Map<string, SyncQueueItem>();
     syncQueue.forEach(item => {
       const key = `${item.date}|${item.memberId}|${item.taskId}`;
@@ -115,7 +120,6 @@ const App: React.FC = () => {
         const processedTimestamp = Math.max(...itemsToSync.map(i => i.timestamp));
         setSyncQueue(prev => prev.filter(q => q.timestamp > processedTimestamp));
         setSyncStatus('success');
-        // ลด Delay ในการดึงข้อมูลกลับมาเช็คจาก 1000ms เหลือ 300ms
         setTimeout(() => loadGlobalData(true), 300);
       } else {
         setSyncStatus('error');
@@ -151,6 +155,17 @@ const App: React.FC = () => {
     
     localInteractions.current[interactionKey] = Date.now();
 
+    // เช็คจำนวนที่สำเร็จหลังจากเลือก (Optimistic Update)
+    const currentMemberData = progress[date]?.[memberId] || {};
+    const willBeCompletedCount = Object.keys(currentMemberData).filter(tId => tId !== taskId && currentMemberData[tId]).length + (newValue ? 1 : 0);
+
+    // ฉลองเมื่อครบ 10/10 และเป็นครั้งแรกของวันนั้นๆ สำหรับสมาชิกคนนั้น
+    const userCelebrationKey = `${date}-${memberId}`;
+    if (willBeCompletedCount === TASKS.length && !currentValue && !hasCelebratedToday[userCelebrationKey]) {
+      setShowCelebration(true);
+      setHasCelebratedToday(prev => ({ ...prev, [userCelebrationKey]: true }));
+    }
+
     setProgress(prev => ({
       ...prev,
       [date]: {
@@ -173,12 +188,11 @@ const App: React.FC = () => {
     
     setSyncQueue(prev => [...prev, newItem]);
 
-    // ปรับ Debounce ให้สั้นลงเหลือ 200ms เพื่อความรู้สึกที่ "ทันใจ" ขึ้น
     if (queueTimeoutRef.current) clearTimeout(queueTimeoutRef.current);
     queueTimeoutRef.current = window.setTimeout(() => {
       processQueue();
     }, 200);
-  }, [activeMember, progress, processQueue]);
+  }, [activeMember, progress, processQueue, hasCelebratedToday]);
 
   useEffect(() => {
     const fetchReflection = async () => {
@@ -213,15 +227,22 @@ const App: React.FC = () => {
         <LeaderSummaryModal currentDate={currentDate} progress={progress} onClose={() => setShowLeaderSummary(false)} />
       )}
 
+      {showCelebration && (
+        <CelebrationModal onClose={() => setShowCelebration(false)} />
+      )}
+
       <header className="bg-emerald-950 text-white px-4 py-4 shadow-2xl sticky top-0 z-[50] border-b border-white/5 backdrop-blur-md">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-emerald-800/40 rounded-xl flex items-center justify-center border border-white/10">🕌</div>
-            <div>
+            <div className="flex flex-col items-start min-w-0">
               <h1 className="text-xl font-black tracking-tighter leading-none">DEENTRACKER</h1>
-              <div className="flex items-center gap-2 mt-1">
+              <p className="text-[5px] text-white/20 font-bold whitespace-nowrap leading-none mt-1 uppercase w-full" style={{ textAlignLast: 'justify' }}>
+                Create & Design By: Afitree Yamaenoh
+              </p>
+              <div className="flex items-center gap-2 mt-1.5">
                 <div className={`w-1.5 h-1.5 rounded-full ${syncQueue.length > 0 ? 'bg-amber-400 animate-pulse' : (syncStatus === 'error' ? 'bg-red-500' : 'bg-emerald-400')}`}></div>
-                <p className="text-[8px] font-bold uppercase tracking-widest text-emerald-400">
+                <p className="text-[8px] font-bold uppercase tracking-widest text-emerald-400/80">
                   {syncQueue.length > 0 ? `กำลังส่งข้อมูล ${syncQueue.length} รายการ...` : lastUpdatedText}
                 </p>
               </div>

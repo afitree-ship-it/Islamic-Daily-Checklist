@@ -9,13 +9,8 @@ const FALLBACK_REFLECTION: DailyReflection = {
 };
 
 export async function getDailyMotivation(progressSummary: string): Promise<DailyReflection> {
-  const apiKey = process.env.API_KEY || "";
-  
-  if (!apiKey || apiKey.includes("กรุณาวาง")) {
-    return FALLBACK_REFLECTION;
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
+  // Always initialize GoogleGenAI with the API key from process.env.API_KEY directly.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   try {
     const response = await ai.models.generateContent({
@@ -35,6 +30,7 @@ export async function getDailyMotivation(progressSummary: string): Promise<Daily
       },
     });
 
+    // Access the extracted string directly via the .text property (not a method).
     const text = response.text;
     if (!text) return FALLBACK_REFLECTION;
     return JSON.parse(text.trim());

@@ -21,8 +21,13 @@ const MemberSelector: React.FC<MemberSelectorProps> = ({ onSelect, onLeaderAcces
         {/* Compact Header */}
         <div className="bg-gradient-to-br from-emerald-800 to-emerald-950 p-4 text-white text-center flex-shrink-0">
           <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center mx-auto mb-2 text-lg border border-white/10 shadow-inner">🕌</div>
-          <h2 className="text-base font-black tracking-tight leading-tight">DEENTRACKER</h2>
-          <p className="text-emerald-300 text-[8px] font-bold uppercase tracking-[0.2em] mt-1">ยินดีต้อนรับ กรุณาเลือกชื่อของคุณ</p>
+          <div className="flex flex-col items-center mx-auto w-fit">
+            <h2 className="text-base font-black tracking-tight leading-tight">DEENTRACKER</h2>
+            <p className="text-[5px] text-white/30 font-bold whitespace-nowrap leading-none mt-1 uppercase w-full" style={{ textAlignLast: 'justify' }}>
+              Create & Design By: Afitree Yamaenoh
+            </p>
+          </div>
+          <p className="text-emerald-300 text-[8px] font-bold uppercase tracking-[0.2em] mt-2">ยินดีต้อนรับ กรุณาเลือกชื่อของคุณ</p>
         </div>
         
         {/* Member Grid - 4 Columns, Compact Padding */}
@@ -47,17 +52,20 @@ const MemberSelector: React.FC<MemberSelectorProps> = ({ onSelect, onLeaderAcces
           ))}
         </div>
         
-        {/* Minimal Footer */}
-        <div className="px-4 py-3 bg-white border-t border-slate-100 flex-shrink-0">
+        {/* Footer with Leader Access and Credits */}
+        <div className="px-4 py-3 bg-white border-t border-slate-100 flex-shrink-0 text-center">
           <button 
             onClick={onLeaderAccess}
-            className="w-full flex items-center justify-center gap-2 py-1 text-[9px] font-black text-slate-400 hover:text-amber-600 transition-colors uppercase tracking-[0.15em]"
+            className="w-full flex items-center justify-center gap-2 py-1 text-[9px] font-black text-slate-400 hover:text-amber-600 transition-colors uppercase tracking-[0.15em] mb-1"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
             </svg>
             Leader Access
           </button>
+          <p className="text-[5px] font-bold text-slate-300/40 uppercase tracking-widest italic leading-none mt-1">
+            Create & Design By: Afitree Yamaenoh
+          </p>
         </div>
       </div>
     </div>
