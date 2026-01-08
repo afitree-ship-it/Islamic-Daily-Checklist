@@ -12,20 +12,29 @@
             font-family: 'Anuphan', sans-serif;
             background-color: #f8fafc;
         }
+        #root { min-height: 100vh; }
     </style>
-<script type="importmap">
+    <script>
+        // ประกาศ shim สำหรับ process.env ทันทีเพื่อป้องกัน Error ในระดับ Global
+        window.process = { env: { API_KEY: "" } };
+    </script>
+    <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
-    "recharts": "https://esm.sh/recharts@^3.6.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "@google/genai": "https://esm.sh/@google/genai@1.3.0",
+    "recharts": "https://esm.sh/recharts@2.15.0?external=react,react-dom",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/"
   }
 }
 </script>
 </head>
 <body>
     <div id="root"></div>
+    <!-- โหลด Application Entry Point -->
+    <script type="module" src="./index.tsx"></script>
 </body>
 </html>

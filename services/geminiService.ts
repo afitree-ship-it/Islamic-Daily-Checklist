@@ -3,10 +3,19 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { DailyReflection } from "../types";
 
 export async function getDailyMotivation(progressSummary: string): Promise<DailyReflection> {
-  // Always create a new instance right before making an API call to ensure 
-  // it uses the most up-to-date API key.
-  // Use the API key string directly from the environment variable.
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  // ตรวจสอบว่ามี API Key หรือไม่ ถ้าไม่มีให้ใช้ dummy เพื่อไม่ให้แอป crash
+  const apiKey = process.env.API_KEY || "";
+  
+  if (!apiKey) {
+    console.warn("API_KEY is not defined. AI features will be disabled.");
+    return {
+      quote: "การมีความอดทนคือส่วนหนึ่งของความศรัทธา",
+      reference: "คำสอนอิสลาม",
+      message: "กรุณาตั้งค่า API Key เพื่อรับข้อความแนะนำจาก AI"
+    };
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   
   try {
     const response = await ai.models.generateContent({
@@ -31,6 +40,11 @@ export async function getDailyMotivation(progressSummary: string): Promise<Daily
     return JSON.parse(text.trim());
   } catch (error: any) {
     console.error("Gemini API Error:", error);
-    throw new Error("ไม่สามารถโหลดข้อมูลจาก AI ได้ในขณะนี้");
+    // Fallback เมื่อ AI มีปัญหา
+    return {
+      quote: "แท้จริงหลังความยากลำบาก จะมีความง่ายดาย",
+      reference: "อัลกุรอาน 94:5",
+      message: "ขอให้ทุกคนรักษาความดีต่อไป อัลลอฮฺทรงเห็นในความพยายาม"
+    };
   }
 }
