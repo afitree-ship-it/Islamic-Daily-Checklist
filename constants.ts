@@ -1,15 +1,18 @@
 
 import { Task, Member } from './types';
 
+// ใช้ไอคอนบุคคลแบบมินิมอลเหมือนกันทุกคนตามคำขอ
+const MINIMAL_AVATAR = '👤';
+
 export const MEMBERS: Member[] = [
-  { id: 'm1', name: 'อฟิตรี' },
-  { id: 'm2', name: 'อนันต์' },
-  { id: 'm3', name: 'กูรีดวน' },
-  { id: 'm4', name: 'นูรดิน' },
-  { id: 'm5', name: 'อะฟิฟ' },
-  { id: 'm6', name: 'อิสมาอีล' },
-  { id: 'm7', name: 'อับดุลฮากีม' },
-  { id: 'm8', name: 'ซอลาฮุดดีน' },
+  { id: 'm1', name: 'อฟิตรี', avatar: MINIMAL_AVATAR },
+  { id: 'm2', name: 'อนันต์', avatar: MINIMAL_AVATAR },
+  { id: 'm3', name: 'กูรีดวน', avatar: MINIMAL_AVATAR },
+  { id: 'm4', name: 'นูรดิน', avatar: MINIMAL_AVATAR },
+  { id: 'm5', name: 'อะฟิฟ', avatar: MINIMAL_AVATAR },
+  { id: 'm6', name: 'อิสมาอีล', avatar: MINIMAL_AVATAR },
+  { id: 'm7', name: 'อับดุลฮากีม', avatar: MINIMAL_AVATAR },
+  { id: 'm8', name: 'ซอลาฮุดดีน', avatar: MINIMAL_AVATAR },
 ];
 
 export const TASKS: Task[] = [

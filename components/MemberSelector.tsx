@@ -10,42 +10,54 @@ interface MemberSelectorProps {
 
 const MemberSelector: React.FC<MemberSelectorProps> = ({ onSelect, onLeaderAccess }) => {
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/95 backdrop-blur-md p-4 overflow-y-auto">
-      <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-[0_32px_64px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in zoom-in duration-500 my-auto">
-        <div className="bg-gradient-to-br from-emerald-600 to-teal-700 p-10 text-white text-center relative">
-          <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-6 text-4xl shadow-inner border border-white/10">🕌</div>
-          <h2 className="text-3xl font-black mb-2 tracking-tight">ยินดีต้อนรับสู่ DeenTracker</h2>
-          <p className="text-emerald-100 font-medium">กรุณาเลือกชื่อของคุณเพื่อเริ่มบันทึกกิจกรรมวันนี้</p>
+    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-[#062e1e]/95 backdrop-blur-sm p-2 sm:p-4">
+      {/* 
+        Main Modal Container 
+        - max-w-sm: กะทัดรัดเป็นพิเศษ
+        - max-h-[95vh]: ป้องกันการล้นจอในโหมดแนวนอน (Landscape)
+      */}
+      <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-[0_30px_60px_-12px_rgba(0,0,0,0.5)] overflow-hidden animate-in fade-in zoom-in duration-300 border border-emerald-100/20 flex flex-col">
+        
+        {/* Compact Header */}
+        <div className="bg-gradient-to-br from-emerald-800 to-emerald-950 p-4 text-white text-center flex-shrink-0">
+          <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center mx-auto mb-2 text-lg border border-white/10 shadow-inner">🕌</div>
+          <h2 className="text-base font-black tracking-tight leading-tight">DEENTRACKER</h2>
+          <p className="text-emerald-300 text-[8px] font-bold uppercase tracking-[0.2em] mt-1">ยินดีต้อนรับ กรุณาเลือกชื่อของคุณ</p>
         </div>
         
-        <div className="p-8 grid grid-cols-2 sm:grid-cols-3 gap-4 max-h-[60vh] overflow-y-auto custom-scrollbar">
+        {/* Member Grid - 4 Columns, Compact Padding */}
+        <div className="p-3 grid grid-cols-4 gap-2 bg-slate-50/50 flex-grow overflow-y-auto max-h-[60vh] sm:max-h-none">
           {MEMBERS.map((member) => (
             <button
               key={member.id}
               onClick={() => onSelect(member)}
-              className="group p-5 rounded-3xl border-2 border-slate-100 hover:border-emerald-500 hover:bg-emerald-50 transition-all text-center flex flex-col items-center gap-3 shadow-sm hover:shadow-md"
+              className="group bg-white p-2 py-3 rounded-xl border border-slate-100 hover:border-emerald-500 hover:bg-emerald-50 transition-all text-center flex flex-col items-center gap-1 active:scale-90 shadow-sm"
             >
-              <div className="w-14 h-14 rounded-full bg-slate-50 group-hover:bg-emerald-100 flex items-center justify-center text-slate-300 group-hover:text-emerald-600 transition-colors border border-slate-100">
-                <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+              {/* Minimal SVG Person Icon - Uniform for all */}
+              <div className="w-9 h-9 rounded-full bg-slate-50 group-hover:bg-emerald-100 flex items-center justify-center text-slate-300 group-hover:text-emerald-600 transition-colors">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
                 </svg>
               </div>
-              <span className="font-black text-slate-700 group-hover:text-emerald-700 tracking-tight">{member.name}</span>
+              <span className="font-black text-slate-600 group-hover:text-emerald-800 tracking-tighter text-[9px] sm:text-[10px] truncate w-full px-0.5">
+                {member.name}
+              </span>
             </button>
           ))}
         </div>
         
-        <div className="p-10 bg-slate-50 flex flex-col items-center gap-6 border-t border-slate-100">
-            <button 
-              onClick={onLeaderAccess}
-              className="w-full max-w-xs bg-slate-800 text-white font-black py-5 px-8 rounded-3xl shadow-2xl hover:bg-slate-900 transition-all active:scale-95 flex items-center justify-center gap-3 uppercase tracking-widest text-xs"
-            >
-              <svg className="w-6 h-6 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
-              โหมดหัวหน้ากลุ่ม (ADMIN)
-            </button>
-            <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">DeenTracker Community System v1.0</p>
+        {/* Minimal Footer */}
+        <div className="px-4 py-3 bg-white border-t border-slate-100 flex-shrink-0">
+          <button 
+            onClick={onLeaderAccess}
+            className="w-full flex items-center justify-center gap-2 py-1 text-[9px] font-black text-slate-400 hover:text-amber-600 transition-colors uppercase tracking-[0.15em]"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            Leader Access
+          </button>
         </div>
       </div>
     </div>

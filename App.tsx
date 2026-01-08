@@ -109,7 +109,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#f1f5f1] pb-20 font-['Anuphan'] selection:bg-emerald-200">
       {isInitialLoading && (
-        <div className="fixed inset-0 z-[300] bg-emerald-950 flex flex-col items-center justify-center text-white">
+        <div className="fixed inset-0 z-[1000] bg-emerald-950 flex flex-col items-center justify-center text-white">
           <div className="w-14 h-14 border-4 border-emerald-400 border-t-transparent rounded-full animate-spin mb-6"></div>
           <p className="font-bold text-lg tracking-widest uppercase">DeenTracker</p>
         </div>
