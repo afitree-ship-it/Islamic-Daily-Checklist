@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { MEMBERS, TASKS } from '../constants';
 import { ProgressData, SyncQueueItem } from '../types';
 
@@ -22,15 +22,40 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
 }) => {
   const dailyProgress = progress[currentDate] || {};
 
+  // จัดลำดับสมาชิกใหม่: ให้คนที่ถูกเลือก (activeMemberId) อยู่บนสุด
+  const sortedMembers = useMemo(() => {
+    if (!activeMemberId) return MEMBERS;
+    const active = MEMBERS.find(m => m.id === activeMemberId);
+    const others = MEMBERS.filter(m => m.id !== activeMemberId);
+    return active ? [active, ...others] : MEMBERS;
+  }, [activeMemberId]);
+
   const isPending = (memberId: string, taskId: string) => {
     return syncQueue.some(q => q.date === currentDate && q.memberId === memberId && q.taskId === taskId);
   };
 
   return (
     <div className="space-y-6">
+      {/* Header Section with Change User Button */}
+      <div className="flex justify-between items-center px-2">
+        <h3 className="text-xl font-black text-slate-800 flex items-center">
+          <span className="w-1.5 h-6 bg-emerald-500 rounded-full mr-3"></span>
+          รายการเช็คลิสต์
+        </h3>
+        <button 
+          onClick={onOpenSelector}
+          className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white text-[10px] font-black rounded-xl border border-orange-400 hover:bg-orange-600 transition-all shadow-lg shadow-orange-200 active:scale-95 uppercase tracking-widest animate-pulse hover:animate-none"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+          เปลี่ยนแปลงคน
+        </button>
+      </div>
+
       {/* Mobile View */}
       <div className="grid grid-cols-1 gap-4 lg:hidden">
-        {MEMBERS.map((member) => {
+        {sortedMembers.map((member) => {
           const isMe = member.id === activeMemberId;
           const memberData = dailyProgress[member.id] || {};
           const completedCount = Object.values(memberData).filter(v => v).length;
@@ -119,7 +144,7 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-emerald-50">
-              {MEMBERS.map((member) => {
+              {sortedMembers.map((member) => {
                 const isMe = member.id === activeMemberId;
                 const isInteractionDisabled = !isMe && activeMemberId !== null;
                 const memberData = dailyProgress[member.id] || {};
