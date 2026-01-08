@@ -15,95 +15,120 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({ currentDate, progress, 
   const dailyProgress = progress[currentDate] || {};
 
   return (
-    <div className="overflow-x-auto shadow-xl rounded-2xl border border-slate-200 bg-white">
-      <table className="w-full text-sm text-left border-collapse">
-        <thead className="text-xs text-emerald-700 uppercase bg-emerald-50 sticky top-0 z-30">
-          <tr>
-            <th className="px-6 py-4 font-bold border-r min-w-[160px] bg-emerald-50 sticky left-0 z-40 shadow-[2px_0_0_0_rgba(0,0,0,0.05)]">
-              ชื่อสมาชิก
-            </th>
-            {TASKS.map(task => (
-              <th key={task.id} className="px-2 py-4 text-center font-bold min-w-[100px]">
-                {task.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {MEMBERS.map((member) => {
-            const isMe = member.id === activeMemberId;
-            const isLocked = activeMemberId !== null && !isMe;
-            
-            return (
-              <tr 
-                key={member.id} 
-                className={`transition-all duration-200 ${isMe ? 'bg-emerald-50/70' : isLocked ? 'opacity-60 bg-slate-50/30' : 'hover:bg-slate-50'}`}
-              >
-                <td className={`px-6 py-4 font-medium border-r sticky left-0 z-20 shadow-[2px_0_0_0_rgba(0,0,0,0.05)] transition-colors ${
-                  isMe ? 'bg-emerald-100 text-emerald-900 font-black' : 'bg-white text-slate-900'
-                }`}>
-                  <div className="flex items-center gap-2">
-                    <span className="truncate">{member.name}</span>
-                    {isMe && (
-                      <span className="flex-shrink-0 bg-emerald-600 text-white text-[10px] px-1.5 py-0.5 rounded-md uppercase font-bold shadow-sm">คุณ</span>
-                    )}
-                    {isLocked && (
-                      <svg className="w-3 h-3 text-slate-400" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </div>
-                </td>
+    <div className="space-y-6">
+      {/* Mobile View: Compact Cards */}
+      <div className="grid grid-cols-1 gap-4 lg:hidden">
+        {MEMBERS.map((member) => {
+          const isMe = member.id === activeMemberId;
+          const isLocked = activeMemberId !== null && !isMe;
+          const memberData = dailyProgress[member.id] || {};
+          const completedCount = Object.values(memberData).filter(v => v).length;
+
+          return (
+            <div 
+              key={member.id} 
+              className={`rounded-2xl border transition-all ${
+                isMe ? 'border-emerald-500 bg-white shadow-lg ring-2 ring-emerald-50' : 'border-slate-200 bg-slate-50/30'
+              } ${isLocked ? 'opacity-80' : ''}`}
+            >
+              <div className={`px-4 py-3 flex justify-between items-center border-b ${isMe ? 'border-emerald-100' : 'border-slate-100'}`}>
+                <div className="flex items-center gap-2">
+                  <span className={`text-base font-black ${isMe ? 'text-emerald-900' : 'text-slate-700'}`}>{member.name}</span>
+                  {isMe && <span className="bg-emerald-600 text-white text-[9px] px-1.5 py-0.5 rounded-md uppercase font-black">คุณ</span>}
+                </div>
+                <div className="text-[10px] font-bold text-slate-400 bg-white px-2 py-1 rounded-full border border-slate-100">
+                  สำเร็จ {completedCount}/{TASKS.length}
+                </div>
+              </div>
+              
+              <div className="p-3 grid grid-cols-2 gap-2">
                 {TASKS.map((task) => {
-                  const isChecked = !!dailyProgress[member.id]?.[task.id];
+                  const isChecked = !!memberData[task.id];
                   return (
-                    <td key={task.id} className="px-2 py-4 text-center">
-                      <button
-                        onClick={() => {
-                          if (!isLocked) {
-                            if (activeMemberId === null) {
-                                onOpenSelector();
-                            } else {
-                                onToggle(currentDate, member.id, task.id);
-                            }
-                          }
-                        }}
-                        disabled={isLocked}
-                        className={`w-10 h-10 rounded-xl border-2 flex items-center justify-center transition-all ${
-                          isChecked 
-                            ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-100 scale-105' 
-                            : 'border-slate-200 text-transparent hover:border-emerald-300 hover:bg-emerald-50/30'
-                        } ${isLocked ? 'cursor-not-allowed grayscale-[0.5]' : 'active:scale-95 cursor-pointer'}`}
-                        aria-label={`${member.name} - ${task.label}`}
-                        title={isLocked ? `เฉพาะคุณ ${member.name} เท่านั้นที่บันทึกส่วนนี้ได้` : ''}
-                      >
-                        {isChecked ? (
-                          <svg className="w-6 h-6 animate-in zoom-in duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-                          </svg>
-                        ) : (
-                          <div className={`w-2 h-2 rounded-full ${isMe ? 'bg-emerald-200' : 'bg-slate-200'}`}></div>
-                        )}
-                      </button>
-                    </td>
+                    <button
+                      key={task.id}
+                      onClick={() => {
+                        if (!isLocked) {
+                          if (activeMemberId === null) onOpenSelector();
+                          else onToggle(currentDate, member.id, task.id);
+                        }
+                      }}
+                      disabled={isLocked}
+                      className={`relative flex flex-col items-start p-3 rounded-xl border transition-all text-left h-16 ${
+                        isChecked 
+                          ? 'bg-emerald-600 border-emerald-600 text-white shadow-sm' 
+                          : `bg-white border-slate-200 text-slate-600`
+                      } ${isLocked ? 'grayscale-[0.3]' : 'active:scale-95'}`}
+                    >
+                      <span className={`text-[8px] font-bold uppercase tracking-tight mb-0.5 ${isChecked ? 'text-emerald-100' : 'text-slate-400'}`}>
+                        {task.category}
+                      </span>
+                      <span className="text-xs font-bold leading-tight line-clamp-2">{task.label}</span>
+                      <div className={`absolute top-2 right-2 w-4 h-4 rounded-full flex items-center justify-center border ${
+                        isChecked ? 'bg-white border-white text-emerald-600' : 'bg-slate-50 border-slate-100 text-transparent'
+                      }`}>
+                        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    </button>
                   );
                 })}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop View: Table (Keep and refine) */}
+      <div className="hidden lg:block overflow-x-auto shadow-xl rounded-2xl border border-slate-200 bg-white">
+        <table className="w-full text-sm text-left border-collapse">
+          <thead className="text-xs text-emerald-700 uppercase bg-emerald-50/80">
+            <tr>
+              <th className="px-6 py-4 font-bold border-r min-w-[160px] sticky left-0 z-40 bg-emerald-50 shadow-[2px_0_0_0_rgba(0,0,0,0.05)]">สมาชิก</th>
+              {TASKS.map(task => (
+                <th key={task.id} className="px-2 py-4 text-center font-bold min-w-[100px]">{task.label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {MEMBERS.map((member) => {
+              const isMe = member.id === activeMemberId;
+              const isLocked = activeMemberId !== null && !isMe;
+              return (
+                <tr key={member.id} className={isMe ? 'bg-emerald-50/30' : 'hover:bg-slate-50/50 transition-colors'}>
+                  <td className={`px-6 py-4 font-bold border-r sticky left-0 z-20 shadow-[2px_0_0_0_rgba(0,0,0,0.05)] ${isMe ? 'bg-emerald-100/50 text-emerald-900' : 'bg-white'}`}>
+                    {member.name} {isMe && ' (คุณ)'}
+                  </td>
+                  {TASKS.map((task) => {
+                    const isChecked = !!dailyProgress[member.id]?.[task.id];
+                    return (
+                      <td key={task.id} className="px-2 py-4 text-center">
+                        <button
+                          onClick={() => !isLocked && (activeMemberId ? onToggle(currentDate, member.id, task.id) : onOpenSelector())}
+                          disabled={isLocked}
+                          className={`w-10 h-10 mx-auto rounded-lg border flex items-center justify-center transition-all ${
+                            isChecked ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' : 'border-slate-200 bg-white'
+                          } ${isLocked ? 'opacity-20 cursor-not-allowed' : 'hover:scale-105 active:scale-95'}`}
+                        >
+                          {isChecked && <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>}
+                        </button>
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
       {activeMemberId === null && (
         <button 
-            onClick={onOpenSelector}
-            className="w-full p-6 bg-amber-50 hover:bg-amber-100 text-amber-900 text-center transition-all group flex flex-col items-center gap-2 border-t border-amber-200"
+          onClick={onOpenSelector}
+          className="w-full p-4 bg-amber-50 rounded-2xl border-2 border-dashed border-amber-200 text-amber-900 font-bold animate-pulse text-center text-sm"
         >
-          <div className="flex items-center gap-3 font-black text-lg">
-            <span className="animate-bounce">👉</span>
-            กรุณาคลิกที่นี่เพื่อเลือกชื่อของคุณก่อน
-            <span className="animate-bounce">👈</span>
-          </div>
-          <p className="text-amber-700 text-sm font-medium opacity-80 group-hover:opacity-100">คุณต้องระบุตัวตนก่อนจึงจะสามารถเริ่มบันทึกกิจกรรมความดีได้</p>
+          👇 เลือกชื่อของคุณเพื่อเริ่มบันทึกความดี 👇
         </button>
       )}
     </div>
