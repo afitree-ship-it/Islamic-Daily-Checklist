@@ -36,7 +36,7 @@ const MemberSelector: React.FC<MemberSelectorProps> = ({ onSelect, onLeaderAcces
                 Create & Design By: Afitree Yamaenoh
               </p>
             </div>
-            <p className="text-emerald-300 text-[9px] sm:text-[10px] font-black uppercase tracking-[0.25em] mt-3">เลือกสมาชิกเพื่อเริ่มต้น</p>
+            <p className="text-emerald-300 text-[9px] sm:text-[10px] font-black uppercase tracking-widest mt-3">เลือกสมาชิกเพื่อเริ่มต้น</p>
           </div>
         </div>
         
@@ -61,22 +61,25 @@ const MemberSelector: React.FC<MemberSelectorProps> = ({ onSelect, onLeaderAcces
           ))}
         </div>
         
-        {/* Footer with Leader Access Outline Button */}
+        {/* Footer with Minimalist Leader Access Button */}
         <div className="px-6 py-6 sm:px-8 bg-white border-t border-slate-100 flex-shrink-0 text-center">
           <button 
             onClick={onLeaderAccess}
-            className="w-full flex items-center justify-center gap-2 py-3 px-4 border-2 border-slate-200 text-[10px] sm:text-xs font-black text-slate-400 hover:text-slate-800 hover:border-slate-400 hover:bg-slate-50 transition-all rounded-2xl uppercase tracking-[0.2em] mb-4 active:scale-[0.98]"
+            className="w-full flex items-center justify-center gap-3 py-4 sm:py-5 px-6 bg-emerald-50/50 text-emerald-900 text-base sm:text-lg font-black rounded-2xl transition-all border-2 border-emerald-100 hover:bg-emerald-100/50 hover:border-emerald-300 active:scale-[0.98] active:bg-emerald-200/50 shadow-sm mb-6 group uppercase tracking-tighter"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-            Leader Access
+            <div className="w-8 h-8 bg-emerald-500/10 rounded-xl flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
+              <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
+            แผงควบคุมหัวหน้า
           </button>
+          
           <div className="flex flex-col gap-1">
             <p className="text-[6px] sm:text-[7px] font-bold text-slate-300 uppercase tracking-widest italic leading-none">
               Create & Design By: Afitree Yamaenoh
             </p>
-            <p className="text-[5px] sm:text-[6px] text-slate-200 uppercase font-bold tracking-tighter">DeenTracker v2.0 • Digital Tasbih & Prayer Sync</p>
+            <p className="text-[5px] sm:text-[6px] text-slate-200 uppercase font-bold tracking-tighter">DeenTracker v2.0 • Digital Management Suite</p>
           </div>
         </div>
       </div>
