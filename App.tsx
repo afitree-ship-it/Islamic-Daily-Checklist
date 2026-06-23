@@ -18,16 +18,30 @@ const App: React.FC = () => {
   const [hasCelebratedToday, setHasCelebratedToday] = useState<Record<string, boolean>>({});
 
   // ใช้ Ref เป็น Master Data ที่เข้าถึงได้ทันที (ป้องกัน State เก่ามาทับ)
-  // แก้ไขการกำหนดค่าเริ่มต้นของ useRef ให้ถูกต้องเพื่อป้องกันข้อผิดพลาด Expected 1 arguments, but got 2.
-  const progressRef = useRef<ProgressData>(
-    JSON.parse(localStorage.getItem('deen_tracker_v1') || '{}')
-  );
+  const progressRef = useRef<ProgressData>({});
+  
+  // โหลดข้อมูลเริ่มต้นอย่างปลอดภัย
+  if (Object.keys(progressRef.current).length === 0) {
+    try {
+      const saved = localStorage.getItem('deen_tracker_v1');
+      if (saved) {
+        progressRef.current = JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn("Failed to parse deen_tracker_v1 from localStorage:", e);
+    }
+  }
 
   const [progress, setProgressState] = useState<ProgressData>(progressRef.current);
   
   const [syncQueue, setSyncQueue] = useState<SyncQueueItem[]>(() => {
-    const savedQueue = localStorage.getItem('deen_sync_queue');
-    return savedQueue ? JSON.parse(savedQueue) : [];
+    try {
+      const savedQueue = localStorage.getItem('deen_sync_queue');
+      return savedQueue ? JSON.parse(savedQueue) : [];
+    } catch (e) {
+      console.warn("Failed to parse deen_sync_queue from localStorage:", e);
+      return [];
+    }
   });
 
   // ป้องกัน Race Condition ระหว่าง Local และ Remote
