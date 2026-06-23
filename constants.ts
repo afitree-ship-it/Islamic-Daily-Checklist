@@ -10,8 +10,6 @@ export const MEMBERS: Member[] = [
   { id: 'กูรีดวน', name: 'กูรีดวน', avatar: MINIMAL_AVATAR },
   { id: 'นูรดิน', name: 'นูรดิน', avatar: MINIMAL_AVATAR },
   { id: 'อะฟิฟ', name: 'อะฟิฟ', avatar: MINIMAL_AVATAR },
-  { id: 'อิสมาแอ', name: 'อิสมาแอ', avatar: MINIMAL_AVATAR },
-  { id: 'อับดุลฮากีม', name: 'อับดุลฮากีม', avatar: MINIMAL_AVATAR },
   { id: 'ซอลาฮุดดีน', name: 'ซอลาฮุดดีน', avatar: MINIMAL_AVATAR },
 ];
 
