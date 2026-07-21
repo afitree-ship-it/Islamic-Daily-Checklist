@@ -1,47 +1,124 @@
-
-import { GoogleGenAI, Type } from "@google/genai";
 import { DailyReflection } from "../types";
 
-const FALLBACK_REFLECTION: DailyReflection = {
-  quote: "แท้จริงหลังความยากลำบาก จะมีความง่ายดาย",
-  reference: "อัลกุรอาน 94:5",
-  message: "ขอให้ทุกคนรักษาความดีต่อไป อัลลอฮฺทรงเห็นในความพยายาม"
-};
-
-export async function getDailyMotivation(progressSummary: string): Promise<DailyReflection> {
-  // สร้าง Controller สำหรับทำ Timeout หาก API ตอบช้าเกิน 8 วินาที
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-  try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `สรุปความคืบหน้ากลุ่ม: "${progressSummary}". ช่วยหาคำคมอิสลาม (อัลกุรอานหรือหะดีษ) เป็นภาษาไทย พร้อมแหล่งที่มา และข้อความให้กำลังใจสั้นๆ`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            quote: { type: Type.STRING },
-            reference: { type: Type.STRING },
-            message: { type: Type.STRING },
-          },
-          required: ["quote", "reference", "message"],
-        },
-      },
-    });
-
-    clearTimeout(timeoutId);
-    const text = response.text;
-    
-    if (!text) return FALLBACK_REFLECTION;
-    
-    return JSON.parse(text.trim());
-  } catch (error: any) {
-    clearTimeout(timeoutId);
-    console.warn("Gemini Service Notice: Using fallback reflection due to error or timeout.");
-    return FALLBACK_REFLECTION;
+// A rich database of 20 beautiful, inspirational Quranic and Hadith quotes in Thai
+const QURAN_QUOTES: DailyReflection[] = [
+  {
+    quote: "แท้จริงหลังความยากลำบาก จะมีความง่ายดาย",
+    reference: "อัลกุรอาน ซูเราะฮฺอัช-ชัรฮฺ (94:5)",
+    message: "ทุกความยากลำบากที่ผ่านเข้ามาคือบททดสอบเพื่อเพิ่มพูนความง่ายดายในชีวิต ขออัลลอฮฺโปรดคุ้มครอง"
+  },
+  {
+    quote: "และเมื่อผู้บ่าวของข้าถามเจ้าเกี่ยวกับข้า แท้จริงแล้วข้านั้นอยู่ใกล้",
+    reference: "อัลกุรอาน ซูเราะฮฺอัล-บะเกาะเราะฮฺ (2:186)",
+    message: "จงอธิษฐานและมั่นใจว่าอัลลอฮฺทรงได้ยินเสียงและอยู่ใกล้เราเสมอ"
+  },
+  {
+    quote: "จงขอความช่วยเหลือด้วยความอดทนและการละหมาด",
+    reference: "อัลกุรอาน ซูเราะฮฺอัล-บะเกาะเราะฮฺ (2:45)",
+    message: "การละหมาดด้วยใจสงบและการยืนหยัดอย่างอดทนคือประตูสู่ทางออกในทุกปัญหา"
+  },
+  {
+    quote: "และผู้ใดมอบหมายต่ออัลลอฮฺ พระองค์ก็จะทรงเป็นผู้พอเพียงแก่เขา",
+    reference: "อัลกุรอาน ซูเราะฮฺอัฏ-เฏาะลาก (65:3)",
+    message: "จงทำหน้าที่ของตนเองให้ดีที่สุด แล้ววางใจในผลลัพธ์ที่พระองค์จะทรงจัดวาง"
+  },
+  {
+    quote: "และอัลลอฮฺทรงอยู่กับบรรดาผู้อดทน",
+    reference: "อัลกุรอาน ซูเราะฮฺอัล-อันฟาล (8:46)",
+    message: "ความอดทนคือความงดงามและเกราะป้องกันอันแข็งแกร่งของผู้ศรัทธา"
+  },
+  {
+    quote: "หากพวกเจ้าขอบคุณ ข้าก็ยิ่งจะเพิ่มพูนให้แก่พวกเจ้า",
+    reference: "อัลกุรอาน ซูเราะฮฺอิบรอฮีม (14:7)",
+    message: "ความสุขเริ่มจากใจที่กตัญญูและเห็นคุณค่าในสิ่งดีๆ ที่มีอยู่รอบตัวเรา"
+  },
+  {
+    quote: "แท้จริงอัลลอฮฺจะไม่ทรงเปลี่ยนแปลงสภาพของชนกลุ่มใด จนกว่าพวกเขาจะเปลี่ยนแปลงสภาพของพวกเขาก่อน",
+    reference: "อัลกุรอาน ซูเราะฮฺอัร-เราะอฺด์ (13:11)",
+    message: "เริ่มต้นความเปลี่ยนแปลงที่ดีจากตัวเราเองในทุกๆ วันด้วยความมุ่งมั่นและตั้งใจ"
+  },
+  {
+    quote: "ดังนั้น จงรำลึกถึงข้า ข้าก็จะรำลึกถึงพวกเจ้า",
+    reference: "อัลกุรอาน ซูเราะฮฺอัล-บะเกาะเราะฮฺ (2:152)",
+    message: "การระลึกถึงพระองค์ผ่านการซิกรุลลอฮฺช่วยขจัดความกังวลและนำความสงบมาสู่จิตใจ"
+  },
+  {
+    quote: "และผู้ใดเกรงกลัวอัลลอฮฺ พระองค์จะทรงหาทางออกให้แก่เขา",
+    reference: "อัลกุรอาน ซูเราะฮฺอัฏ-เฏาะลาก (65:2)",
+    message: "ความยำเกรงและการสำรวจตนเองเสมอจะเปิดประตูแห่งโอกาสและทางออกอันงดงาม"
+  },
+  {
+    quote: "และอัลลอฮฺจะไม่ทรงทดสอบชีวิตใด เว้นแต่ตามความสามารถของชีวิตนั้นเท่านั้น",
+    reference: "อัลกุรอาน ซูเราะฮฺอัล-บะเกาะเราะฮฺ (2:286)",
+    message: "พระองค์ทรงรู้ว่าเราสามารถผ่านพ้นทุกเรื่องราวไปได้ จงมีความหวังและสู้ต่อไป"
+  },
+  {
+    quote: "โอ้บรรดาผู้ศรัทธาเอ๋ย จงแสวงหาความอดทนและการละหมาดเถิด แท้จริงอัลลอฮฺอยู่ร่วมกับผู้มีความอดทน",
+    reference: "อัลกุรอาน ซูเราะฮฺอัล-บะเกาะเราะฮฺ (2:153)",
+    message: "ให้การละหมาดเป็นที่พึ่งทางใจและให้ความอดทนเป็นกุญแจสำคัญสู่ความสำเร็จ"
+  },
+  {
+    quote: "พระอภิบาลของฉันจะทรงชี้นำทางฉันอย่างแน่นอน",
+    reference: "อัลกุรอาน ซูเราะฮฺอัช-ชุอะรออฺ (26:62)",
+    message: "มอบหมายจิตใจแด่พระผู้เป็นเจ้า ผู้นำทางในยามที่เรามืดแปดด้านและต้องการคำชี้นำ"
+  },
+  {
+    quote: "ไม่มีความทุกข์ยากใดๆ ประสบแก่เรา เว้นแต่สิ่งที่อัลลอฮฺได้ทรงลิขิตไว้แก่เราแล้ว",
+    reference: "อัลกุรอาน ซูเราะฮฺอัต-เตาบะฮฺ (9:51)",
+    message: "ยอมรับในสิ่งที่พระองค์จัดวาง เพราะภายใต้ความทุกข์ยากย่อมมีสิ่งที่ดีที่สุดแฝงอยู่เสมอ"
+  },
+  {
+    quote: "พวกเจ้าจงเข้าสู่ความสันติโดยทั่วหน้ากันเถิด",
+    reference: "อัลกุรอาน ซูเราะฮฺอัล-บะเกาะเราะฮฺ (2:208)",
+    message: "ความสงบสุขที่แท้จริงเกิดจากการน้อมรับและดำเนินชีวิตตามหลักธรรมคำสอนและจริยธรรมที่ดี"
+  },
+  {
+    quote: "และพระองค์ทรงรักษาสิ่งที่ดีงามทั้งหลาย",
+    reference: "อัลกุรอาน ซูเราะฮฺฮูด (11:57)",
+    message: "ทุกความดีเล็กๆ น้อยๆ ที่เราทำไม่เคยสูญเปล่า อัลลอฮฺทรงบันทึกและเห็นใจเสมอ"
+  },
+  {
+    quote: "และจงทำความดี แท้จริงอัลลอฮฺทรงรักผู้ทำความดี",
+    reference: "อัลกุรอาน ซูเราะฮฺอัล-บะเกาะเราะฮฺ (2:195)",
+    message: "จงส่งต่อความดีงาม รอยยิ้ม และไมตรีจิตที่จริงใจแก่ผู้คนรอบข้างในทุกๆ วัน"
+  },
+  {
+    quote: "และจงยึดมั่นในสายเชือกของอัลลอฮฺโดยพร้อมเพรียงกัน และอย่าแตกแยกกันเลย",
+    reference: "อัลกุรอาน ซูเราะฮฺอาล อิมรอน (3:103)",
+    message: "ความร่วมมือร่วมใจและความสามัคคีนำมาซึ่งความรัก ความอบอุ่น และความโปรดปราน"
+  },
+  {
+    quote: "หัวใจทั้งหลายจะไม่สงบเงียบด้วยการรำลึกถึงอัลลอฮฺดอกหรือ?",
+    reference: "อัลกุรอาน ซูเราะฮฺอัร-เราะอฺด์ (13:28)",
+    message: "ความสุขอันเป็นนิจเกิดจากหัวใจที่สงบนิ่งและเชื่อมโยงรำลึกถึงพระองค์อย่างสม่ำเสมอ"
+  },
+  {
+    quote: "และบรรดาผู้ที่ต่อสู้ดิ้นรนในทางของเรา แน่นอนเราจะชี้แนะแนวทางที่ถูกต้องแก่พวกเขา",
+    reference: "อัลกุรอาน ซูเราะฮฺอัล-อังกะบูต (29:69)",
+    message: "ทุกหยาดเหงื่อและความพยายามในการขัดเกลาตนเองจะได้รับแสงสว่างชี้นำที่ชัดเจน"
+  },
+  {
+    quote: "จงยึดมั่นในการให้อภัย และจงใช้ให้ทำความดี และจงผินหลังให้แก่บรรดาผู้โง่เขลา",
+    reference: "อัลกุรอาน ซูเราะฮฺอัล-อะอฺรอฟ (7:199)",
+    message: "การให้อภัยและการพยายามกระทำความดีเพื่อส่วนรวมจะช่วยยกระดับจิตวิญญาณของเราให้สูงขึ้น"
   }
+];
+
+// Simple deterministic hash function to pick a quote based on member and date combination
+function getDeterministicHash(dateStr: string, memberId: string): number {
+  const combinedStr = `${dateStr}-${memberId}`;
+  let hash = 0;
+  for (let i = 0; i < combinedStr.length; i++) {
+    const char = combinedStr.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash |= 0; // Convert to 32bit integer
+  }
+  return Math.abs(hash);
+}
+
+export async function getDailyMotivation(dateStr: string, memberId: string = 'default'): Promise<DailyReflection> {
+  // instant local resolution without relying on Gemini network API
+  const hashValue = getDeterministicHash(dateStr, memberId);
+  const index = hashValue % QURAN_QUOTES.length;
+  return QURAN_QUOTES[index];
 }

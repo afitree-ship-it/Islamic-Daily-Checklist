@@ -118,9 +118,13 @@ const App: React.FC = () => {
     isProcessingQueue.current = true;
     setSyncStatus('syncing');
     
+    // Snapshot the entire queue to process and clear, solving the lingering flash & rollback bugs
+    const queueSnapshot = [...syncQueue];
+    const snapshotIds = new Set(queueSnapshot.map(i => i.id));
+    
     // ดึงเฉพาะรายการล่าสุดต่อ 1 Task เพื่อลดจำนวนการเขียน
     const latestItemsMap = new Map<string, SyncQueueItem>();
-    syncQueue.forEach(item => {
+    queueSnapshot.forEach(item => {
       const key = `${item.date}|${item.memberId}|${item.taskId}`;
       if (!latestItemsMap.has(key) || item.timestamp > latestItemsMap.get(key)!.timestamp) {
         latestItemsMap.set(key, item);
@@ -128,7 +132,6 @@ const App: React.FC = () => {
     });
 
     const itemsToSync = Array.from(latestItemsMap.values());
-    const queueIdsToRemove = itemsToSync.map(i => i.id);
     
     try {
       const success = await syncBatchToSheets(itemsToSync.map(i => ({
@@ -139,10 +142,11 @@ const App: React.FC = () => {
       })));
 
       if (success) {
-        setSyncQueue(prev => prev.filter(q => !queueIdsToRemove.includes(q.id)));
+        // Clear all snapshot items from queue upon success to prevent old duplicates from rolling back changes
+        setSyncQueue(prev => prev.filter(q => !snapshotIds.has(q.id)));
         setSyncStatus('success');
-        // ทิ้งช่วง 3 วินาทีให้ Server บันทึกเสร็จแล้วค่อยดึงกลับมาใหม่
-        setTimeout(() => loadGlobalData(true), 3000);
+        // ทิ้งช่วงสั้นลงเพียง 1.5 วินาที แล้วดึงข้อมูลกลับแบบเงียบเบื้องหลัง
+        setTimeout(() => loadGlobalData(true), 1500);
       } else {
         setSyncStatus('error');
       }
@@ -154,13 +158,13 @@ const App: React.FC = () => {
     }
   }, [syncQueue, loadGlobalData]);
 
-  // Debounce การซิงค์เพื่อรวบรวมการกดรัวๆ
+  // Debounce การซิงค์เพื่อรวบรวมการกดรัวๆ (ลดเหลือ 300ms เพื่อความรวดเร็วเสมือนบันทึกทันที)
   useEffect(() => {
     if (syncQueue.length > 0 && !isProcessingQueue.current) {
       if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = window.setTimeout(() => {
         processQueue();
-      }, 2000); 
+      }, 300); 
     }
     return () => {
       if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
@@ -232,12 +236,12 @@ const App: React.FC = () => {
   useEffect(() => {
     let isMounted = true;
     const fetchReflection = async () => {
-      const res = await getDailyMotivation(`วันที่: ${currentDate}`);
+      const res = await getDailyMotivation(currentDate, activeMember?.id || 'default');
       if (isMounted) setReflection(res);
     };
     fetchReflection();
     return () => { isMounted = false; };
-  }, [currentDate]);
+  }, [currentDate, activeMember?.id]);
 
   const handleMemberSelect = (m: Member) => {
     setActiveMember(m);
@@ -289,13 +293,30 @@ const App: React.FC = () => {
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
-            <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400/80 bg-white/5 border border-white/5 rounded-lg px-2 py-1 hidden sm:inline-block">
+          <div className="flex items-center gap-1.5 md:gap-2">
+            <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400/80 bg-white/5 border border-white/5 rounded-lg px-2 py-1 hidden md:inline-block">
               {syncStatus === 'syncing' ? 'กำลังบันทึก...' : lastUpdatedText}
             </span>
             <button 
+              onClick={() => setShowMemberSelector(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black rounded-lg transition-all active:scale-95 shadow-sm hover:shadow-md border border-amber-400/20 group"
+              title="คลิกเพื่อสลับผู้ใช้"
+            >
+              <svg className="w-3.5 h-3.5 stroke-[2.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <span className="max-w-[70px] sm:max-w-[120px] truncate">
+                {activeMember ? activeMember.name : 'สลับผู้ใช้'}
+              </span>
+              <div className="flex items-center pl-1 ml-0.5 border-l border-white/20 opacity-80 group-hover:opacity-100 transition-opacity">
+                <svg className="w-3 h-3 text-amber-100 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="3">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </button>
+            <button 
               onClick={() => loadGlobalData()}
-              className="p-2 bg-white/5 hover:bg-white/10 rounded-xl transition-colors border border-white/5 active:scale-95"
+              className="p-2 bg-white/5 hover:bg-white/10 rounded-lg transition-colors border border-white/5 active:scale-95 flex items-center justify-center"
               title="รีเฟรชข้อมูล"
             >
               <svg className={`w-4 h-4 ${syncStatus === 'syncing' ? 'animate-spin opacity-50' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357-2H15" /></svg>

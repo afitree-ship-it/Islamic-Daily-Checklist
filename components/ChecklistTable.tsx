@@ -128,40 +128,23 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
 }) => {
   const dailyProgress = progress[currentDate] || {};
 
-  const recentDates = useMemo(() => {
-    const dates = [];
-    const today = new Date();
+  const currentDateLabel = useMemo(() => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
     
-    // Generate the last 5 days (Today, Yesterday, -2, -3, -4)
-    for (let i = 4; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(today.getDate() - i);
-      const yyyymmdd = d.toISOString().split('T')[0];
-      
-      let label = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
-      if (i === 0) label = 'วันนี้';
-      else if (i === 1) label = 'เมื่อวาน';
-      
-      dates.push({
-        dateStr: yyyymmdd,
-        label
-      });
-    }
-
-    // If selected currentDate is not in the list, dynamically append/prepend it
-    const hasCurrent = dates.some(d => d.dateStr === currentDate);
-    if (!hasCurrent) {
+    if (currentDate === todayStr) {
+      return 'วันนี้';
+    } else if (currentDate === yesterdayStr) {
+      return 'เมื่อวาน';
+    } else {
       const d = new Date(currentDate);
       if (!isNaN(d.getTime())) {
-        const label = d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
-        dates.unshift({
-          dateStr: currentDate,
-          label: `${label} 📅`
-        });
+        return d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
       }
+      return currentDate;
     }
-    
-    return dates;
   }, [currentDate]);
 
   const sortedMembers = useMemo(() => {
@@ -178,6 +161,24 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
     return syncQueue.some(q => q.date === currentDate && q.memberId === memberId && q.taskId === taskId);
   };
 
+  const handlePrevDate = () => {
+    const d = new Date(currentDate);
+    if (!isNaN(d.getTime())) {
+      d.setDate(d.getDate() - 1);
+      const yyyymmdd = d.toISOString().split('T')[0];
+      onDateChange(yyyymmdd);
+    }
+  };
+
+  const handleNextDate = () => {
+    const d = new Date(currentDate);
+    if (!isNaN(d.getTime())) {
+      d.setDate(d.getDate() + 1);
+      const yyyymmdd = d.toISOString().split('T')[0];
+      onDateChange(yyyymmdd);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-2">
@@ -186,31 +187,32 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
           เช็คลิสต์
         </h3>
         
-        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
-          {/* Recent Date Tabs */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-            {recentDates.map((item) => {
-              const isActive = item.dateStr === currentDate;
-              return (
-                <button
-                  key={item.dateStr}
-                  onClick={() => onDateChange(item.dateStr)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-black whitespace-nowrap transition-all duration-75 ${
-                    isActive 
-                      ? 'bg-emerald-950 text-white shadow-sm ring-1 ring-emerald-900/10 scale-102' 
-                      : 'bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-700 border border-slate-200 shadow-sm'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              );
-            })}
-            
-            {/* Custom Compact Calendar Icon Button */}
-            <div className="relative flex items-center">
-              <button className="p-1.5 rounded-xl bg-white text-slate-500 hover:bg-slate-50 border border-slate-200 flex items-center justify-center relative shadow-sm hover:border-emerald-300 transition-all" title="เลือกวันที่อื่นๆ">
-                <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+          {/* Recent Date Tabs Container with Arrows */}
+          <div className="flex items-center gap-1.5 w-full sm:w-auto">
+            {/* Left Arrow Button */}
+            <button
+              onClick={handlePrevDate}
+              className="p-3 sm:p-2.5 rounded-2xl bg-white hover:bg-slate-50 text-slate-600 hover:text-emerald-600 border border-slate-200/80 shadow-sm flex items-center justify-center min-h-[44px] min-w-[44px] active:scale-95 transition-all"
+              title="ย้อนกลับ 1 วัน"
+            >
+              <svg className="w-5 h-5 stroke-current" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+
+            {/* Unified Center Date Selector Button (Tapping opens Date Picker directly) */}
+            <div className="relative flex items-center flex-grow sm:flex-grow-0">
+              <button 
+                className="w-full sm:w-auto px-5 py-3 sm:px-6 sm:py-2.5 rounded-2xl bg-emerald-950 hover:bg-emerald-900 text-white shadow-md border border-emerald-900/10 flex items-center justify-center gap-2 relative transition-all min-h-[44px] font-black text-sm active:scale-98" 
+                title="คลิกเพื่อเลือกวันอื่นๆ"
+              >
+                <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <span>{currentDateLabel}</span>
+                <svg className="w-4 h-4 text-emerald-400 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
                 </svg>
                 <input 
                   type="date" 
@@ -224,19 +226,18 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
                 />
               </button>
             </div>
+
+            {/* Right Arrow Button */}
+            <button
+              onClick={handleNextDate}
+              className="p-3 sm:p-2.5 rounded-2xl bg-white hover:bg-slate-50 text-slate-600 hover:text-emerald-600 border border-slate-200/80 shadow-sm flex items-center justify-center min-h-[44px] min-w-[44px] active:scale-95 transition-all"
+              title="ถัดไป 1 วัน"
+            >
+              <svg className="w-5 h-5 stroke-current" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
           </div>
-
-          <div className="h-4 w-px bg-slate-200 hidden sm:block"></div>
-
-          <button 
-            onClick={onOpenSelector}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-black rounded-xl border border-slate-200 hover:border-slate-300 transition-all shadow-sm active:scale-95 uppercase tracking-wider"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            สลับผู้ใช้
-          </button>
         </div>
       </div>
 

@@ -41,7 +41,7 @@ const MemberSelector: React.FC<MemberSelectorProps> = ({ onSelect, onLeaderAcces
         </div>
         
         {/* Member Grid - Optimized for Desktop/Mobile */}
-        <div className="p-5 sm:p-8 grid grid-cols-4 gap-3 sm:gap-4 bg-slate-50/50 flex-grow overflow-y-auto scrollbar-hide">
+        <div className="p-5 sm:p-8 grid grid-cols-3 sm:grid-cols-4 gap-3 sm:gap-4 bg-slate-50/50 flex-grow overflow-y-auto scrollbar-hide">
           {MEMBERS.map((member) => (
             <button
               key={member.id}
