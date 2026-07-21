@@ -23,6 +23,13 @@ export const TASKS: Task[] = [
   { id: 't7', label: 'อัซการเช้า', category: 'devotion' },
   { id: 't11', label: 'อัซการเย็น', category: 'devotion' },
   { id: 't8', label: 'อ่านหนังสือ 15นาที.', category: 'action' },
+  { id: 't12', label: 'อ่านบทความ 15 นาที', category: 'action' },
   { id: 't9', label: 'อิสติฆฟัร 100 ครั้ง', category: 'devotion' },
   { id: 't10', label: 'บริจาค', category: 'action' },
 ];
+
+export const getTaskPoints = (taskId: string): number => {
+  const prayerIds = ['t1', 't2', 't3', 't4', 't5'];
+  return prayerIds.includes(taskId) ? 27 : 10;
+};
+

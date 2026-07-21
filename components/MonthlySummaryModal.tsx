@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import { MEMBERS, TASKS } from '../constants';
+import { MEMBERS, TASKS, getTaskPoints } from '../constants';
 import { ProgressData, MonthlyMemberStats } from '../types';
 
 interface MonthlySummaryModalProps {
@@ -15,14 +15,19 @@ const MonthlySummaryModal: React.FC<MonthlySummaryModalProps> = ({ progress, onC
     const stats: MonthlyMemberStats[] = MEMBERS.map(member => {
       let totalCompleted = 0;
       let totalPossible = 0;
+      let totalCompletedScore = 0;
+      let totalPossibleScore = 0;
       const monthDates = Object.keys(progress).filter(date => date.startsWith(currentMonth));
       
       monthDates.forEach(date => {
         const dayData = progress[date]?.[member.id] || {};
         TASKS.forEach(task => {
           totalPossible++;
+          const taskPoints = getTaskPoints(task.id);
+          totalPossibleScore += taskPoints;
           if (dayData[task.id]) {
             totalCompleted++;
+            totalCompletedScore += taskPoints;
           }
         });
       });
@@ -32,7 +37,9 @@ const MonthlySummaryModal: React.FC<MonthlySummaryModalProps> = ({ progress, onC
         memberName: member.name,
         totalCompleted,
         totalPossible,
-        percentage: totalPossible > 0 ? Math.round((totalCompleted / totalPossible) * 100) : 0
+        totalCompletedScore,
+        totalPossibleScore,
+        percentage: totalPossibleScore > 0 ? Math.round((totalCompletedScore / totalPossibleScore) * 100) : 0
       };
     });
 
@@ -51,9 +58,9 @@ const MonthlySummaryModal: React.FC<MonthlySummaryModalProps> = ({ progress, onC
     const yearThai = now.toLocaleDateString('th-TH', { year: 'numeric' });
     const fullDateText = `${monthLong} ${yearThai}`;
     
-    let content = `📊 สรุปรายงานความคืบหน้า DeenTracker\n`;
+    let content = `📊 สรุปรายงานความคืบหน้า DeenTracker (ระบบคิดคะแนนแบบถ่วงน้ำหนัก)\n`;
     content += `📅 ประจำเดือน: ${fullDateText}\n`;
-    content += `📈 ภาพรวมกลุ่ม: ${groupAverage}%\n`;
+    content += `📈 ภาพรวมคะแนนกลุ่ม: ${groupAverage}%\n`;
     content += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
     
     content += `รายชื่อสมาชิกและสถิติความสำเร็จ:\n\n`;
@@ -62,8 +69,9 @@ const MonthlySummaryModal: React.FC<MonthlySummaryModalProps> = ({ progress, onC
       const medal = idx === 0 ? '🥇 ' : idx === 1 ? '🥈 ' : idx === 2 ? '🥉 ' : '🔹 ';
       content += `${medal}${idx + 1}. ${stat.memberName}\n`;
       content += `   • เดือน/ปี: ${fullDateText}\n`;
-      content += `   • ระดับความสำเร็จ: ${stat.percentage}%\n`;
-      content += `   • บันทึกกิจกรรม: ${stat.totalCompleted} ครั้ง (จากทั้งหมด ${stat.totalPossible} รายการ)\n`;
+      content += `   • ระดับความสำเร็จ (ตามน้ำหนักคะแนน): ${stat.percentage}%\n`;
+      content += `   • ได้รับคะแนน: ${stat.totalCompletedScore} จากคะแนนเต็ม ${stat.totalPossibleScore} แต้ม\n`;
+      content += `   • บันทึกกิจกรรมสำเร็จ: ${stat.totalCompleted} ครั้ง (จากทั้งหมด ${stat.totalPossible} รายการ)\n`;
       content += `   • สถานะ: ${stat.percentage >= 80 ? 'ดีเยี่ยม (Excellent)' : stat.percentage >= 50 ? 'ดี (Good)' : 'กำลังพัฒนา (Keep going)'}\n`;
       content += `────────────────────────────────────────────\n`;
     });

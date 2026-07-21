@@ -268,42 +268,41 @@ const App: React.FC = () => {
         <CelebrationModal onClose={() => setShowCelebration(false)} />
       )}
 
-      <header className="bg-emerald-950 text-white px-4 py-4 shadow-2xl sticky top-0 z-[50] border-b border-white/5 backdrop-blur-md">
+      <header className="bg-emerald-950/90 text-white px-4 py-2.5 shadow-md sticky top-0 z-[50] border-b border-white/5 backdrop-blur-md">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center border border-white/10 shadow-inner backdrop-blur-sm relative">
-               <svg className="w-6 h-6 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8.5 h-8.5 bg-white/10 rounded-xl flex items-center justify-center border border-white/10 shadow-inner backdrop-blur-sm relative">
+               <svg className="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" strokeDasharray="3 2" className="opacity-30" />
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                 <polyline points="22 4 12 14.01 9 11.01" strokeWidth="3" className="text-white" />
               </svg>
               {syncStatus === 'syncing' && (
-                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-amber-400 rounded-full border-2 border-emerald-950 animate-pulse"></div>
+                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-amber-400 rounded-full border border-emerald-950 animate-pulse"></div>
               )}
             </div>
             <div className="flex flex-col items-start min-w-0">
-              <h1 className="text-xl font-black tracking-tighter leading-none">DEENTRACKER</h1>
-              <p className="text-[5px] text-white/20 font-bold whitespace-nowrap leading-none mt-1 uppercase w-full" style={{ textAlignLast: 'justify' }}>
+              <h1 className="text-base font-black tracking-tight leading-none">DEENTRACKER</h1>
+              <p className="text-[5px] text-white/30 font-bold whitespace-nowrap leading-none mt-1 uppercase w-full" style={{ textAlignLast: 'justify' }}>
                 Create & Design By: Afitree Yamaenoh
               </p>
-              <div className="flex items-center gap-1.5 mt-1.5">
-                <p className="text-[8px] font-bold uppercase tracking-widest text-emerald-400/60">
-                  {syncStatus === 'syncing' ? 'กำลังบันทึก...' : lastUpdatedText}
-                </p>
-              </div>
             </div>
           </div>
           
           <div className="flex items-center gap-2">
+            <span className="text-[9px] font-black uppercase tracking-wider text-emerald-400/80 bg-white/5 border border-white/5 rounded-lg px-2 py-1 hidden sm:inline-block">
+              {syncStatus === 'syncing' ? 'กำลังบันทึก...' : lastUpdatedText}
+            </span>
             <button 
               onClick={() => loadGlobalData()}
-              className="p-3 bg-white/5 hover:bg-white/10 rounded-2xl transition-colors border border-white/5 active:scale-95"
+              className="p-2 bg-white/5 hover:bg-white/10 rounded-xl transition-colors border border-white/5 active:scale-95"
+              title="รีเฟรชข้อมูล"
             >
-              <svg className={`w-5 h-5 ${syncStatus === 'syncing' ? 'animate-spin opacity-50' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357-2H15" /></svg>
+              <svg className={`w-4 h-4 ${syncStatus === 'syncing' ? 'animate-spin opacity-50' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357-2H15" /></svg>
             </button>
           </div>
         </div>
-        <div className={`absolute bottom-0 left-0 h-[2px] bg-emerald-400 transition-all duration-1000 ${syncStatus === 'syncing' ? 'w-full opacity-100' : 'w-0 opacity-0'}`}></div>
+        <div className={`absolute bottom-0 left-0 h-[1.5px] bg-emerald-400 transition-all duration-1000 ${syncStatus === 'syncing' ? 'w-full opacity-100' : 'w-0 opacity-0'}`}></div>
       </header>
 
       <main className="max-w-6xl mx-auto px-4 pt-6 space-y-6">

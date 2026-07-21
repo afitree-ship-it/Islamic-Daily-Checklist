@@ -36,4 +36,6 @@ export interface MonthlyMemberStats {
   totalCompleted: number;
   totalPossible: number;
   percentage: number;
+  totalCompletedScore?: number;
+  totalPossibleScore?: number;
 }

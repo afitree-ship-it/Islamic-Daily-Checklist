@@ -35,7 +35,7 @@ export async function fetchProgressFromSheets(): Promise<ProgressData | null> {
     
     return sanitizedData;
   } catch (error) {
-    console.error("Failed to fetch from Google Sheets:", error);
+    console.warn("Failed to fetch from Google Sheets:", error);
     return null;
   }
 }
@@ -54,7 +54,7 @@ export async function syncBatchToSheets(items: {date: string, memberId: string, 
     });
     return true;
   } catch (error) {
-    console.error("Failed to batch sync to Google Sheets:", error);
+    console.warn("Failed to batch sync to Google Sheets:", error);
     return false;
   }
 }

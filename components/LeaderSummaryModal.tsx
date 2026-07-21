@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { MEMBERS, TASKS } from '../constants';
+import { MEMBERS, TASKS, getTaskPoints } from '../constants';
 import { ProgressData } from '../types';
 
 interface LeaderSummaryModalProps {
@@ -14,14 +14,20 @@ const LeaderSummaryModal: React.FC<LeaderSummaryModalProps> = ({ currentDate, pr
   const [viewDate, setViewDate] = useState(currentDate);
   const dailyProgress = progress[viewDate] || {};
 
+  const maxScore = useMemo(() => {
+    return TASKS.reduce((sum, t) => sum + getTaskPoints(t.id), 0);
+  }, []);
+
   // คำนวณข้อมูลสำหรับกราฟจากวันที่เลือก
   const chartData = useMemo(() => {
     return MEMBERS.map(member => {
       const mData = dailyProgress[member.id] || {};
       const completedCount = Object.values(mData).filter(v => v).length;
+      const score = Object.keys(mData).reduce((sum, tId) => mData[tId] ? sum + getTaskPoints(tId) : sum, 0);
       return {
         name: member.name,
         completed: completedCount,
+        score,
         total: TASKS.length
       };
     });
@@ -47,12 +53,14 @@ const LeaderSummaryModal: React.FC<LeaderSummaryModalProps> = ({ currentDate, pr
     content += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
     content += `📅 ประจำเดือน: ${monthLong} ${yearThai}\n`;
     content += `📅 ช่วงเวลา: ${firstDay.toLocaleDateString('th-TH')} ถึง ${lastDay.toLocaleDateString('th-TH')}\n`;
-    content += `📊 จำนวนเกณฑ์การวัดผล: ${TASKS.length} รายการต่อวัน\n`;
+    content += `📊 น้ำหนักคะแนนรวม: ${maxScore} คะแนนต่อวัน (ละหมาดญะมาอะฮฺข้อละ 27 คะแนน, ข้ออื่นข้อละ 100 คะแนน)\n`;
     content += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
 
     MEMBERS.forEach((member, index) => {
       let memberMonthCompleted = 0;
+      let memberMonthCompletedScore = 0;
       let memberMonthPossible = 0;
+      let memberMonthPossibleScore = 0;
       let memberDailyLog = "";
 
       for (let d = 1; d <= totalDaysInMonth; d++) {
@@ -63,12 +71,15 @@ const LeaderSummaryModal: React.FC<LeaderSummaryModalProps> = ({ currentDate, pr
         
         const dayData = progress[dateKey]?.[member.id] || {};
         const dayCompletedCount = Object.values(dayData).filter(v => v).length;
-        const dayPercentage = Math.round((dayCompletedCount / TASKS.length) * 100);
+        const dayScore = Object.keys(dayData).reduce((sum, tId) => dayData[tId] ? sum + getTaskPoints(tId) : sum, 0);
+        const dayPercentage = Math.round((dayScore / maxScore) * 100);
         
         memberMonthCompleted += dayCompletedCount;
+        memberMonthCompletedScore += dayScore;
         memberMonthPossible += TASKS.length;
+        memberMonthPossibleScore += maxScore;
 
-        memberDailyLog += `📅 วันที่ ${dayLabel}/${monthLabel} | ความสำเร็จ: ${dayPercentage}%\n`;
+        memberDailyLog += `📅 วันที่ ${dayLabel}/${monthLabel} | คะแนนความสำเร็จ: ${dayScore}/${maxScore} แต้ม (${dayPercentage}%)\n`;
         
         if (Object.keys(dayData).length === 0) {
           memberDailyLog += `   [ ไม่มีการบันทึกข้อมูลในวันนี้ ]\n`;
@@ -76,19 +87,19 @@ const LeaderSummaryModal: React.FC<LeaderSummaryModalProps> = ({ currentDate, pr
           TASKS.forEach(task => {
             const isChecked = !!dayData[task.id];
             const statusIcon = isChecked ? "[✓]" : "[ ]";
-            memberDailyLog += `   ${statusIcon} ${task.label}\n`;
+            memberDailyLog += `   ${statusIcon} ${task.label} (+${getTaskPoints(task.id)} แต้ม)\n`;
           });
         }
         memberDailyLog += `------------------------------------------------------------\n`;
       }
 
-      const totalPercentage = memberMonthPossible > 0 
-        ? Math.round((memberMonthCompleted / memberMonthPossible) * 100) 
+      const totalPercentage = memberMonthPossibleScore > 0 
+        ? Math.round((memberMonthCompletedScore / memberMonthPossibleScore) * 100) 
         : 0;
 
       content += `👤 สมาชิก: ${member.name}\n`;
-      content += `📈 สรุปภาพรวมเดือนนี้: ${totalPercentage}%\n`;
-      content += `📝 สถิติการบันทึก: ทำได้รวม ${memberMonthCompleted} จากทั้งหมด ${memberMonthPossible} รายการ\n`;
+      content += `📈 สรุปภาพรวมคะแนนเดือนนี้: ${totalPercentage}%\n`;
+      content += `📝 สถิติการบันทึก: ได้รับ ${memberMonthCompletedScore} จากคะแนนรวมทั้งหมด ${memberMonthPossibleScore} แต้ม (ทำเสร็จ ${memberMonthCompleted}/${memberMonthPossible} รายการ)\n`;
       content += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
       content += memberDailyLog;
       content += `\n\n`;
@@ -170,7 +181,7 @@ const LeaderSummaryModal: React.FC<LeaderSummaryModalProps> = ({ currentDate, pr
                     textAnchor="end"
                     height={60}
                   />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} domain={[0, TASKS.length]} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#94a3b8' }} domain={[0, maxScore]} />
                   <Tooltip 
                     cursor={{ fill: '#f1f5f9', radius: 8 }}
                     content={({ active, payload }) => {
@@ -178,14 +189,15 @@ const LeaderSummaryModal: React.FC<LeaderSummaryModalProps> = ({ currentDate, pr
                         return (
                           <div className="bg-white p-2 shadow-xl rounded-xl border-2 border-emerald-100">
                             <p className="font-black text-slate-800 text-[10px] tracking-tighter leading-none mb-1">{payload[0].payload.name}</p>
-                            <p className="text-emerald-600 font-black text-xs leading-none">{`${payload[0].value} / ${TASKS.length}`}</p>
+                            <p className="text-emerald-600 font-black text-xs leading-none">{`${payload[0].payload.score} / ${maxScore} คะแนน`}</p>
+                            <p className="text-slate-400 text-[8px] font-bold mt-1 leading-none">ทำได้ {payload[0].payload.completed}/{payload[0].payload.total} กิจกรรม</p>
                           </div>
                         );
                       }
                       return null;
                     }}
                   />
-                  <Bar dataKey="completed" radius={[6, 6, 6, 6]} barSize={28}>
+                  <Bar dataKey="score" radius={[6, 6, 6, 6]} barSize={28}>
                     {chartData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
@@ -205,7 +217,8 @@ const LeaderSummaryModal: React.FC<LeaderSummaryModalProps> = ({ currentDate, pr
             {MEMBERS.map(member => {
               const mData = dailyProgress[member.id] || {};
               const completedCount = Object.values(mData).filter(v => v).length;
-              const percentage = Math.round((completedCount / TASKS.length) * 100);
+              const score = Object.keys(mData).reduce((sum, tId) => mData[tId] ? sum + getTaskPoints(tId) : sum, 0);
+              const percentage = Math.round((score / maxScore) * 100);
               
               return (
                 <div key={member.id} className="border-2 border-slate-100 rounded-[1.5rem] p-4 bg-white shadow-sm hover:border-emerald-200 transition-all group">
@@ -213,7 +226,7 @@ const LeaderSummaryModal: React.FC<LeaderSummaryModalProps> = ({ currentDate, pr
                     <div className="min-w-0 pr-1">
                       <h4 className="font-black text-slate-900 text-sm truncate leading-none tracking-tighter">{member.name}</h4>
                       <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-tighter leading-none">
-                        {completedCount}/{TASKS.length} กิจกรรม
+                        {score}/{maxScore} แต้ม ({completedCount} กิจกรรม)
                       </p>
                     </div>
                     <div className={`flex flex-col items-center justify-center min-w-[36px] h-[36px] rounded-xl font-black border-2 ${
@@ -235,7 +248,7 @@ const LeaderSummaryModal: React.FC<LeaderSummaryModalProps> = ({ currentDate, pr
                       return (
                         <div key={task.id} className="flex items-center justify-between gap-1 leading-none">
                           <span className={`text-[11px] font-bold truncate max-w-[85%] tracking-tighter ${isChecked ? 'text-slate-800' : 'text-slate-300'}`}>
-                            {task.label}
+                            {task.label} (+{getTaskPoints(task.id)})
                           </span>
                           {isChecked ? (
                             <div className="w-3.5 h-3.5 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 flex-shrink-0">

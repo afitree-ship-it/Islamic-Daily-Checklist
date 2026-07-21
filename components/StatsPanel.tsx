@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { MEMBERS, TASKS } from '../constants';
+import { MEMBERS, TASKS, getTaskPoints } from '../constants';
 import { ProgressData } from '../types';
 import MonthlySummaryModal from './MonthlySummaryModal';
 
@@ -14,13 +14,24 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ currentDate, progress }) => {
   const [showMonthly, setShowMonthly] = useState(false);
   const dailyProgress = progress[currentDate] || {};
 
+  const maxScore = useMemo(() => {
+    return TASKS.reduce((sum, t) => sum + getTaskPoints(t.id), 0);
+  }, []);
+
   const chartData = useMemo(() => {
     return MEMBERS.map(member => {
       const memberChecks = dailyProgress[member.id] || {};
       const completedCount = Object.values(memberChecks).filter(v => v).length;
+      const score = Object.keys(memberChecks).reduce((sum, tId) => {
+        if (memberChecks[tId]) {
+          return sum + getTaskPoints(tId);
+        }
+        return sum;
+      }, 0);
       return {
         name: member.name,
         completed: completedCount,
+        score,
         total: TASKS.length
       };
     });
@@ -59,7 +70,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ currentDate, progress }) => {
               textAnchor="end"
               height={60}
             />
-            <YAxis hide domain={[0, TASKS.length]} />
+            <YAxis hide domain={[0, maxScore]} />
             <Tooltip 
               cursor={{ fill: '#f8fafc', radius: 8 }}
               content={({ active, payload }) => {
@@ -67,14 +78,15 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ currentDate, progress }) => {
                   return (
                     <div className="bg-white p-3 shadow-2xl rounded-2xl border border-emerald-50 scale-110">
                       <p className="font-black text-slate-800 text-xs">{payload[0].payload.name}</p>
-                      <p className="text-emerald-600 font-black text-sm">{`${payload[0].value} / ${TASKS.length}`}</p>
+                      <p className="text-emerald-600 font-black text-sm">{`${payload[0].payload.score} / ${maxScore} คะแนน`}</p>
+                      <p className="text-slate-400 text-[10px] font-bold mt-1">{`ทำได้ ${payload[0].payload.completed} / ${TASKS.length} กิจกรรม`}</p>
                     </div>
                   );
                 }
                 return null;
               }}
             />
-            <Bar dataKey="completed" radius={[8, 8, 8, 8]} barSize={32}>
+            <Bar dataKey="score" radius={[8, 8, 8, 8]} barSize={32}>
               {chartData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
@@ -85,9 +97,9 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ currentDate, progress }) => {
 
       <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="p-4 bg-emerald-900 text-white rounded-2xl shadow-lg shadow-emerald-100 flex flex-col justify-center">
-            <p className="text-[8px] font-black uppercase tracking-widest opacity-60 mb-1">ภาพรวมกลุ่ม</p>
+            <p className="text-[8px] font-black uppercase tracking-widest opacity-60 mb-1">ภาพรวมกลุ่ม (คะแนน)</p>
             <p className="text-2xl font-black">
-                {Math.round((chartData.reduce((acc, curr) => acc + curr.completed, 0) / (MEMBERS.length * TASKS.length)) * 100)}%
+                {Math.round((chartData.reduce((acc, curr) => acc + curr.score, 0) / (MEMBERS.length * maxScore)) * 100)}%
             </p>
         </div>
         <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
