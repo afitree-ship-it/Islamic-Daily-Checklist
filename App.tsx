@@ -65,7 +65,7 @@ const App: React.FC = () => {
   const [reflection, setReflection] = useState<DailyReflection | null>(null);
   const [showLeaderSummary, setShowLeaderSummary] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error' | 'offline'>('idle');
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(false);
 
   // บันทึก Queue ลง localStorage สม่ำเสมอ
   useEffect(() => {
@@ -108,7 +108,7 @@ const App: React.FC = () => {
     setLastUpdatedText(`อัปเดตล่าสุด: ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}`);
   }, []);
 
-  const loadGlobalData = useCallback(async (isSilent = false) => {
+  const loadGlobalData = useCallback(async (isSilent = true) => {
     if (!isSilent) setSyncStatus('syncing');
     try {
       const remoteData = await fetchProgressFromSheets();

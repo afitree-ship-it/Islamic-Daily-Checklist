@@ -1,4 +1,3 @@
-
 import { ProgressData } from '../types';
 
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxO5U99nteeyh2_-2mLmfJjfkqj7Rc2I62XbaaDbkpYgyJpzSeD3Fdo5N6NmKbCMsVW/exec'; 
@@ -16,11 +15,16 @@ const formatDateKey = (dateInput: any): string => {
 export async function fetchProgressFromSheets(): Promise<ProgressData | null> {
   if (!SCRIPT_URL || SCRIPT_URL.includes('XXXXX')) return null;
   
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 4000); // 4 วินาที Timeout เพื่อไม่ให้รอคอยนาน
+
   try {
     const response = await fetch(`${SCRIPT_URL}?t=${Date.now()}`, {
       method: 'GET',
-      cache: 'no-store'
+      cache: 'no-store',
+      signal: controller.signal
     });
+    clearTimeout(timeoutId);
     
     if (!response.ok) throw new Error('Network response was not ok');
     const rawData = await response.json();
@@ -35,7 +39,8 @@ export async function fetchProgressFromSheets(): Promise<ProgressData | null> {
     
     return sanitizedData;
   } catch (error) {
-    console.warn("Failed to fetch from Google Sheets:", error);
+    clearTimeout(timeoutId);
+    console.warn("Failed to fetch from Google Sheets (or timed out):", error);
     return null;
   }
 }
@@ -44,11 +49,10 @@ export async function syncBatchToSheets(items: {date: string, memberId: string, 
   if (!SCRIPT_URL || SCRIPT_URL.includes('XXXXX') || items.length === 0) return false;
 
   try {
-    // ใช้ mode: 'no-cors' และ keepalive: true เพื่อความเร็วสูงสุดและรับประกันการส่งข้อมูล
     await fetch(SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors', 
-      keepalive: true, // สำคัญ: ช่วยให้ Request ทำงานต่อแม้ปิด Browser ทันที
+      keepalive: true,
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify(items),
     });

@@ -1,5 +1,6 @@
 export interface NotificationSettings {
   enabled: boolean;
+  soundEnabled: boolean;
   times: string[]; // Array of HH:mm strings, e.g. ["06:00", "15:35"]
   lastNotifiedMap: Record<string, string>; // { "06:00": "YYYY-MM-DD", "15:35": "YYYY-MM-DD" }
 }
@@ -12,6 +13,12 @@ export function isIOS(): boolean {
   return /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream;
 }
 
+export function isAndroid(): boolean {
+  if (typeof window === 'undefined') return false;
+  const userAgent = window.navigator.userAgent || '';
+  return /Android/i.test(userAgent);
+}
+
 export function isIOSStandalone(): boolean {
   if (typeof window === 'undefined') return false;
   return (
@@ -20,11 +27,10 @@ export function isIOSStandalone(): boolean {
   );
 }
 
-export function isIOSInAppBrowser(): boolean {
-  if (!isIOS()) return false;
+export function isInAppBrowser(): boolean {
+  if (typeof window === 'undefined') return false;
   const userAgent = window.navigator.userAgent || '';
-  // Line, Facebook, Messenger, Instagram, Twitter in-app browsers
-  return /Line|FBAN|FBAV|Instagram|Twitter|MicroMessenger/i.test(userAgent);
+  return /Line|FBAN|FBAV|Instagram|Twitter|MicroMessenger|TikTok|Snapchat/i.test(userAgent);
 }
 
 export function isNotificationSupported(): boolean {
@@ -42,11 +48,8 @@ export async function requestNotificationPermission(): Promise<boolean> {
   try {
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
-      // Register service worker if available
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js').catch(() => {
-          // Fallback handled silently
-        });
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
       }
       return true;
     }
@@ -60,6 +63,7 @@ export async function requestNotificationPermission(): Promise<boolean> {
 export function getNotificationSettings(): NotificationSettings {
   const defaultSettings: NotificationSettings = {
     enabled: true,
+    soundEnabled: true,
     times: ['06:00', '15:35'],
     lastNotifiedMap: {}
   };
@@ -79,6 +83,7 @@ export function getNotificationSettings(): NotificationSettings {
       }
       return {
         enabled: parsed.enabled ?? defaultSettings.enabled,
+        soundEnabled: parsed.soundEnabled ?? defaultSettings.soundEnabled,
         times: Array.isArray(times) && times.length > 0 ? times : defaultSettings.times,
         lastNotifiedMap: parsed.lastNotifiedMap || {}
       };
@@ -101,9 +106,54 @@ export function saveNotificationSettings(settings: Partial<NotificationSettings>
   return updated;
 }
 
-export async function sendNotification(title: string, body: string): Promise<boolean> {
-  if (!isNotificationSupported()) return false;
-  if (Notification.permission !== 'granted') return false;
+/**
+ * Play a gentle double-chime notification sound using Web Audio API
+ */
+export function playNotificationSound(): void {
+  try {
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+
+    const now = ctx.currentTime;
+    
+    // First tone (E5 ~ 659Hz)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(659.25, now);
+    gain1.gain.setValueAtTime(0.15, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.4);
+
+    // Second higher tone (A5 ~ 880Hz)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(880, now + 0.15);
+    gain2.gain.setValueAtTime(0.2, now + 0.15);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.15);
+    osc2.stop(now + 0.7);
+  } catch (e) {
+    console.warn('Web Audio playback failed:', e);
+  }
+}
+
+export async function sendNotification(title: string, body: string, playSound = true): Promise<boolean> {
+  const settings = getNotificationSettings();
+  if (playSound && settings.soundEnabled) {
+    playNotificationSound();
+  }
+
+  if (!isNotificationSupported() || Notification.permission !== 'granted') {
+    return false;
+  }
 
   const options: NotificationOptions = {
     body,
@@ -131,9 +181,9 @@ export async function sendNotification(title: string, body: string): Promise<boo
 }
 
 export async function sendTestNotification(): Promise<boolean> {
+  playNotificationSound();
   const hasPermission = await requestNotificationPermission();
-  if (!hasPermission) return false;
-
+  
   return sendNotification(
     '🌅 ทดสอบแจ้งเตือน DeenTracker',
     'ระบบแจ้งเตือนพร้อมใช้งาน! คุณจะได้รับการแจ้งเตือนเวลา 06:00 น. และ 15:35 น. เพื่อบันทึกเช็คลิสต์ความดีประจำวัน ✨'
@@ -143,13 +193,11 @@ export async function sendTestNotification(): Promise<boolean> {
 export function checkAndTriggerScheduledNotification(memberName?: string): void {
   const settings = getNotificationSettings();
   if (!settings.enabled) return;
-  if (!isNotificationSupported() || Notification.permission !== 'granted') return;
 
   const now = new Date();
   const hours = String(now.getHours()).padStart(2, '0');
   const minutes = String(now.getMinutes()).padStart(2, '0');
   const currentTime = `${hours}:${minutes}`;
-
   const todayStr = now.toISOString().split('T')[0];
 
   for (const scheduledTime of settings.times) {
@@ -168,7 +216,7 @@ export function checkAndTriggerScheduledNotification(memberName?: string): void 
           body = `สวัสดีตอนบ่าย${nameGreeting}! อย่าลืมมาอัปเดตเช็คลิสต์ความดีประจำวันช่วงบ่ายกันนะครับ ✨`;
         }
 
-        sendNotification(title, body);
+        sendNotification(title, body, true);
 
         const updatedMap = { ...settings.lastNotifiedMap, [scheduledTime]: todayStr };
         saveNotificationSettings({ lastNotifiedMap: updatedMap });
@@ -179,7 +227,6 @@ export function checkAndTriggerScheduledNotification(memberName?: string): void 
 
 /**
  * Generate standard .ics Calendar File for iOS Apple Calendar & Reminders
- * Ensures daily alerts ring directly on iOS devices without Web Push restrictions
  */
 export function downloadCalendarICS(times: string[]): void {
   const now = new Date();
@@ -192,7 +239,6 @@ export function downloadCalendarICS(times: string[]): void {
   times.forEach((time, index) => {
     const [h, m] = time.split(':');
     const startDT = `${year}${month}${day}T${h}${m}00`;
-    // 15-minute duration
     const endMinutes = (parseInt(m, 10) + 15) % 60;
     const endHours = parseInt(h, 10) + Math.floor((parseInt(m, 10) + 15) / 60);
     const endDT = `${year}${month}${day}T${String(endHours).padStart(2, '0')}${String(endMinutes).padStart(2, '0')}00`;
