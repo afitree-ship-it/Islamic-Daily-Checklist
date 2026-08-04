@@ -6,6 +6,27 @@ export interface NotificationSettings {
 
 const STORAGE_KEY = 'deen_tracker_notification_settings';
 
+export function isIOS(): boolean {
+  if (typeof window === 'undefined') return false;
+  const userAgent = window.navigator.userAgent || '';
+  return /iPad|iPhone|iPod/.test(userAgent) && !(window as any).MSStream;
+}
+
+export function isIOSStandalone(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    (window.navigator as any).standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches
+  );
+}
+
+export function isIOSInAppBrowser(): boolean {
+  if (!isIOS()) return false;
+  const userAgent = window.navigator.userAgent || '';
+  // Line, Facebook, Messenger, Instagram, Twitter in-app browsers
+  return /Line|FBAN|FBAV|Instagram|Twitter|MicroMessenger/i.test(userAgent);
+}
+
 export function isNotificationSupported(): boolean {
   return typeof window !== 'undefined' && 'Notification' in window;
 }
@@ -49,7 +70,6 @@ export function getNotificationSettings(): NotificationSettings {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
-      // Migration & compatibility check
       let times = parsed.times;
       if (!times && parsed.time) {
         times = [parsed.time];
@@ -94,7 +114,6 @@ export async function sendNotification(title: string, body: string): Promise<boo
   };
 
   try {
-    // Try Service Worker notification first for mobile compatibility
     if ('serviceWorker' in navigator) {
       const registration = await navigator.serviceWorker.getRegistration();
       if (registration && registration.active) {
@@ -103,7 +122,6 @@ export async function sendNotification(title: string, body: string): Promise<boo
       }
     }
 
-    // Standard Notification fallback
     new Notification(title, options);
     return true;
   } catch (e) {
@@ -152,10 +170,68 @@ export function checkAndTriggerScheduledNotification(memberName?: string): void 
 
         sendNotification(title, body);
 
-        // Update notification history map
         const updatedMap = { ...settings.lastNotifiedMap, [scheduledTime]: todayStr };
         saveNotificationSettings({ lastNotifiedMap: updatedMap });
       }
     }
   }
+}
+
+/**
+ * Generate standard .ics Calendar File for iOS Apple Calendar & Reminders
+ * Ensures daily alerts ring directly on iOS devices without Web Push restrictions
+ */
+export function downloadCalendarICS(times: string[]): void {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+
+  let eventsStr = '';
+
+  times.forEach((time, index) => {
+    const [h, m] = time.split(':');
+    const startDT = `${year}${month}${day}T${h}${m}00`;
+    // 15-minute duration
+    const endMinutes = (parseInt(m, 10) + 15) % 60;
+    const endHours = parseInt(h, 10) + Math.floor((parseInt(m, 10) + 15) / 60);
+    const endDT = `${year}${month}${day}T${String(endHours).padStart(2, '0')}${String(endMinutes).padStart(2, '0')}00`;
+
+    const summary = time === '06:00' 
+      ? '🌅 เช็คลิสต์ความดี DeenTracker ยามเช้า' 
+      : `🕌 เช็คลิสต์ความดี DeenTracker (${time} น.)`;
+
+    eventsStr += `
+BEGIN:VEVENT
+UID:deentracker-reminder-${time}-${index}@deentracker.app
+DTSTAMP:${startDT}Z
+DTSTART;TZID=Asia/Bangkok:${startDT}
+DTEND;TZID=Asia/Bangkok:${endDT}
+RRULE:FREQ=DAILY
+SUMMARY:${summary}
+DESCRIPTION:ได้เวลาอัปเดตเช็คลิสต์ความดีประจำวันใน DeenTracker แล้วครับ ✨
+BEGIN:VALARM
+TRIGGER:-PT0M
+ACTION:DISPLAY
+DESCRIPTION:เตือนเช็คลิสต์ความดี DeenTracker
+END:VALARM
+END:VEVENT`;
+  });
+
+  const icsContent = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//DeenTracker//Notification Reminders//TH
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:DeenTracker Reminders${eventsStr}
+END:VCALENDAR`.trim();
+
+  const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', 'DeenTracker-Reminders.ics');
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }

@@ -6,6 +6,10 @@ import {
   saveNotificationSettings, 
   sendTestNotification,
   isNotificationSupported,
+  isIOS,
+  isIOSStandalone,
+  isIOSInAppBrowser,
+  downloadCalendarICS,
   NotificationSettings 
 } from '../utils/notification';
 
@@ -25,6 +29,10 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ onClose, a
   const [testResult, setTestResult] = useState<string | null>(null);
   const [isTesting, setIsTesting] = useState(false);
 
+  const onIOS = isIOS();
+  const onIOSApp = isIOSStandalone();
+  const onIOSInApp = isIOSInAppBrowser();
+
   useEffect(() => {
     setPermission(getNotificationPermissionStatus());
     setSettings(getNotificationSettings());
@@ -38,7 +46,11 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ onClose, a
       setSettings(prev => ({ ...prev, enabled: true }));
       setTestResult('✅ อนุญาตการแจ้งเตือนเรียบร้อยแล้ว!');
     } else {
-      setTestResult('⚠️ ไม่ได้รับการอนุญาตแจ้งเตือน กรุณาเปิดสิทธิ์ในการตั้งค่าเบราว์เซอร์/มือถือ');
+      if (onIOS && !onIOSApp) {
+        setTestResult('⚠️ ระบบ iOS ของ Apple กำหนดให้ต้อง "เพิ่มไปยังหน้าจอโฮม" ก่อนเปิดรับแจ้งเตือน หรือกดปุ่มบันทึกลงปฏิทิน iPhone ด้านล่าง');
+      } else {
+        setTestResult('⚠️ ไม่ได้รับการอนุญาตแจ้งเตือน กรุณาเปิดสิทธิ์ในการตั้งค่าเบราว์เซอร์/มือถือ');
+      }
     }
   };
 
@@ -74,13 +86,22 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ onClose, a
     if (success) {
       setTestResult('🎉 ส่งการแจ้งเตือนทดสอบเรียบร้อยแล้ว! ตรวจสอบที่หน้าจอมือถือของคุณได้เลย');
     } else {
-      setTestResult('⚠️ ไม่สามารถส่งการแจ้งเตือนได้ กรุณาตรวจสอบว่าได้เปิดสิทธิ์แจ้งเตือนแล้วหรือยัง');
+      if (onIOS && !onIOSApp) {
+        setTestResult('⚠️ iOS Safari กำหนดให้ติดตั้งหน้าจอโฮมก่อน หรือใช้ปุ่ม "บันทึกลงปฏิทิน iPhone" เพื่อเตือนได้ 100%');
+      } else {
+        setTestResult('⚠️ ไม่สามารถส่งการแจ้งเตือนได้ กรุณาตรวจสอบว่าได้เปิดสิทธิ์แจ้งเตือนแล้วหรือยัง');
+      }
     }
+  };
+
+  const handleDownloadCalendar = () => {
+    downloadCalendarICS(settings.times);
+    setTestResult('📅 ดาวน์โหลดไฟล์ปฏิทินสำเร็จ! กดเปิดไฟล์เพื่อ "บันทึกปฏิทิน" ลง iPhone/iPad ได้ทันที');
   };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 flex flex-col gap-5 relative overflow-hidden max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-100 flex flex-col gap-4.5 relative overflow-hidden max-h-[90vh] overflow-y-auto">
         
         {/* Header */}
         <div className="flex justify-between items-start">
@@ -92,7 +113,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ onClose, a
             </div>
             <div>
               <h2 className="text-lg font-black text-slate-800 leading-tight">ตั้งค่าการแจ้งเตือนประจำวัน</h2>
-              <p className="text-xs text-slate-500 font-medium">เตือนเช็คลิสต์บนมือถือ (รอบเช้า & รอบบ่าย)</p>
+              <p className="text-xs text-slate-500 font-medium">เตือนเช็คลิสต์บนมือถือ (06:00 น. & 15:35 น.)</p>
             </div>
           </div>
           <button 
@@ -105,17 +126,56 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ onClose, a
           </button>
         </div>
 
+        {/* Special Banner for iOS / iPhone users */}
+        {onIOS && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-2xl p-4 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-blue-900 flex items-center gap-1.5">
+                <span> คำแนะนำพิเศษสำหรับ iPhone / iPad</span>
+              </span>
+              <span className="text-[10px] bg-blue-200/60 text-blue-800 px-2 py-0.5 rounded-full font-black">
+                iOS Solution
+              </span>
+            </div>
+            <p className="text-[11px] text-blue-800 leading-relaxed font-medium">
+              ข้อจำกัดของ Apple iOS บนเบราว์เซอร์จะไม่ยอมให้แอปส่งการแจ้งเตือนตรงๆ จนกว่าจะทำ 1 ใน 2 วิธีนี้:
+            </p>
+
+            {/* iOS Solution 1: Add to Calendar */}
+            <button
+              onClick={handleDownloadCalendar}
+              className="w-full py-2.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl shadow-md transition-all active:scale-98 flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span>📅 วิธีที่ 1: เพิ่มลงปฏิทิน iPhone (แนะนำ เตือนได้ 100%)</span>
+            </button>
+
+            {/* iOS Solution 2: Add to Home Screen Step-by-Step */}
+            <div className="bg-white/80 backdrop-blur-sm p-3 rounded-xl border border-blue-100 text-[10px] text-slate-700 space-y-1">
+              <div className="font-bold text-blue-900">📲 วิธีที่ 2: เพิ่มลงหน้าจอโฮม (PWA Web Push):</div>
+              <ol className="list-decimal pl-4 space-y-0.5 leading-snug">
+                {onIOSInApp && <li>กดเมนูมุมขวาบน เลือก <strong>"เปิดใน Safari"</strong> ก่อน</li>}
+                <li>ใน Safari ให้กดปุ่ม <strong>"แชร์"</strong> (ไอคอนรูปสี่เหลี่ยมมีลูกศรชี้ขึ้น ⎘)</li>
+                <li>เลื่อนลงแล้วเลือก <strong>"เพิ่มไปยังหน้าจอโฮม"</strong> (Add to Home Screen ➕)</li>
+                <li>เปิดแอป DeenTracker จากหน้าจอโฮม แล้วมากดปุ่มเปิดสิทธิ์แจ้งเตือนที่นี่อีกครั้ง</li>
+              </ol>
+            </div>
+          </div>
+        )}
+
         {/* Permission Status Box */}
         {!isNotificationSupported() ? (
           <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl p-4 text-xs font-medium">
-            ⚠️ เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือน Web Notifications
+            ⚠️ เบราว์เซอร์นี้ไม่รองรับ Web Notifications โดยตรง สามารถกดปุ่มเพิ่มลงปฏิทินมือถือด้านล่างเพื่อรับแจ้งเตือนได้แทน
           </div>
         ) : permission !== 'granted' ? (
           <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 flex flex-col gap-3">
             <div className="flex items-start gap-2.5">
               <span className="text-lg">🔔</span>
               <div className="text-xs text-amber-900 leading-relaxed font-medium">
-                ต้องการการอนุญาตเพื่อส่งการแจ้งเตือนเช็คลิสต์ประจำวัน (06:00 น. และ 15:35 น.) บนมือถือของคุณ
+                กดเปิดสิทธิ์การแจ้งเตือน เพื่อให้แอปส่งการแจ้งเตือนเช็คลิสต์เวลา {settings.times.join(' น. และ ')} น. บนมือถือ
               </div>
             </div>
             <button
@@ -239,21 +299,22 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ onClose, a
 
         {/* Test result message */}
         {testResult && (
-          <div className="text-xs font-bold text-center p-2.5 bg-slate-100 rounded-xl text-slate-700 animate-fade-in">
+          <div className="text-xs font-bold text-center p-2.5 bg-slate-100 rounded-xl text-slate-700 animate-fade-in leading-relaxed">
             {testResult}
           </div>
         )}
 
-        {/* Mobile Setup Guide Tip */}
-        <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/60 space-y-1.5 text-[11px] text-slate-600">
-          <div className="font-black text-slate-800 flex items-center gap-1.5">
-            <span>💡 คำแนะนำสำหรับมือถือ:</span>
+        {/* General Mobile Setup Guide Tip */}
+        {!onIOS && (
+          <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/60 space-y-1.5 text-[11px] text-slate-600">
+            <div className="font-black text-slate-800 flex items-center gap-1.5">
+              <span>💡 คำแนะนำสำหรับมือถือ Android:</span>
+            </div>
+            <p className="leading-relaxed">
+              เมื่อกดอนุญาต การแจ้งเตือนจะส่งไปยังหน้าจอมือถือของคุณโดยตรงตามเวลาที่ตั้งไว้ ({settings.times.join(' น. และ ')} น.)
+            </p>
           </div>
-          <p className="leading-relaxed">
-            • <strong>Android:</strong> เมื่อเปิดอนุญาต การแจ้งเตือนจะขึ้นตรงตามเวลาที่ตั้งไว้ (06:00 น. และ 15:35 น.)<br />
-            • <strong>iOS / iPhone:</strong> ให้กดปุ่ม <strong>"แชร์" (Share)</strong> ใน Safari แล้วเลือก <strong>"เพิ่มไปยังหน้าจอโฮม" (Add to Home Screen)</strong> เพื่อเปิดรับการแจ้งเตือนบนมือถือ
-          </p>
-        </div>
+        )}
 
         {/* Close Button */}
         <button
