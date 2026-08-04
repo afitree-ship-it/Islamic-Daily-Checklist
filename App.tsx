@@ -5,17 +5,29 @@ import StatsPanel from './components/StatsPanel';
 import MemberSelector from './components/MemberSelector';
 import LeaderSummaryModal from './components/LeaderSummaryModal';
 import CelebrationModal from './components/CelebrationModal';
+import { NotificationModal } from './components/NotificationModal';
 import { ProgressData, DailyReflection, Member, SyncQueueItem } from './types';
 import { getDailyMotivation } from './services/geminiService';
 import { fetchProgressFromSheets, syncBatchToSheets } from './services/sheetService';
 import { TASKS } from './constants';
+import { checkAndTriggerScheduledNotification } from './utils/notification';
 
 const App: React.FC = () => {
   const [currentDate, setCurrentDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [activeMember, setActiveMember] = useState<Member | null>(null);
   const [showMemberSelector, setShowMemberSelector] = useState(true);
   const [showCelebration, setShowCelebration] = useState(false);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [hasCelebratedToday, setHasCelebratedToday] = useState<Record<string, boolean>>({});
+
+  // ตรวจสอบการแจ้งเตือนตามเวลารายวัน (เช่น 06:00 น.) ทุกๆ 30 วินาที
+  useEffect(() => {
+    checkAndTriggerScheduledNotification(activeMember?.name);
+    const interval = setInterval(() => {
+      checkAndTriggerScheduledNotification(activeMember?.name);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [activeMember?.name]);
 
   // ใช้ Ref เป็น Master Data ที่เข้าถึงได้ทันที (ป้องกัน State เก่ามาทับ)
   const progressRef = useRef<ProgressData>({});
@@ -272,6 +284,13 @@ const App: React.FC = () => {
         <CelebrationModal onClose={() => setShowCelebration(false)} />
       )}
 
+      {showNotificationModal && (
+        <NotificationModal 
+          onClose={() => setShowNotificationModal(false)} 
+          activeMemberName={activeMember?.name}
+        />
+      )}
+
       <header className="bg-emerald-950/90 text-white px-4 py-2.5 shadow-md sticky top-0 z-[50] border-b border-white/5 backdrop-blur-md">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-2.5">
@@ -313,6 +332,17 @@ const App: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                 </svg>
               </div>
+            </button>
+            <button 
+              onClick={() => setShowNotificationModal(true)}
+              className="p-2 bg-white/5 hover:bg-white/10 text-emerald-300 hover:text-emerald-200 rounded-lg transition-colors border border-white/5 active:scale-95 flex items-center justify-center relative"
+              title="ตั้งค่าแจ้งเตือน 06:00 น."
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full animate-ping"></span>
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-emerald-400 rounded-full"></span>
             </button>
             <button 
               onClick={() => loadGlobalData()}

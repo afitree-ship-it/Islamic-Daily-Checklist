@@ -11,6 +11,7 @@ export const MEMBERS: Member[] = [
   { id: 'นูรดิน', name: 'นูรดิน', avatar: MINIMAL_AVATAR },
   { id: 'อะฟิฟ', name: 'อะฟิฟ', avatar: MINIMAL_AVATAR },
   { id: 'ซอลาฮุดดีน', name: 'ซอลาฮุดดีน', avatar: MINIMAL_AVATAR },
+  { id: 'อัฟฟาน', name: 'อัฟฟาน', avatar: MINIMAL_AVATAR },
 ];
 
 export const TASKS: Task[] = [
