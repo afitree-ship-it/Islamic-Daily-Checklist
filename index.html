@@ -60,6 +60,55 @@
             pointer-events: none;
             user-select: none;
         }
+
+        /* เอฟเฟคโลโก้หายใจ (Breathing Logo Effect) */
+        @keyframes logoBreath {
+            0%, 100% {
+                transform: scale(1) translateY(0);
+                filter: drop-shadow(0 0 12px rgba(52, 211, 153, 0.4));
+            }
+            50% {
+                transform: scale(1.07) translateY(-3px);
+                filter: drop-shadow(0 0 28px rgba(52, 211, 153, 0.85));
+            }
+        }
+
+        @keyframes auraPulse {
+            0%, 100% {
+                transform: scale(0.92);
+                opacity: 0.25;
+            }
+            50% {
+                transform: scale(1.22);
+                opacity: 0.65;
+            }
+        }
+
+        @keyframes rotateSlow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes rotateSlowReverse {
+            from { transform: rotate(360deg); }
+            to { transform: rotate(0deg); }
+        }
+
+        .animate-logo-breath {
+            animation: logoBreath 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        }
+
+        .animate-aura-pulse {
+            animation: auraPulse 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        }
+
+        .animate-rotate-slow {
+            animation: rotateSlow 24s linear infinite;
+        }
+
+        .animate-rotate-slow-reverse {
+            animation: rotateSlowReverse 18s linear infinite;
+        }
     </style>
 </head>
 <body>
