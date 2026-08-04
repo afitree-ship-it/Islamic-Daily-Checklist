@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { MEMBERS } from '../constants';
 import { Member } from '../types';
 
@@ -9,12 +9,37 @@ interface MemberSelectorProps {
 }
 
 const MemberSelector: React.FC<MemberSelectorProps> = ({ onSelect, onLeaderAccess }) => {
+  // ล็อคการเลื่อนของ Body และป้องกันการสั่น/เด้งของพื้นหลัง (Overscroll/Elastic bounce on Mobile)
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    const originalOverscroll = document.body.style.overscrollBehavior;
+    
+    document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.overscrollBehavior = originalOverscroll;
+    };
+  }, []);
+
   return (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-[#062e1e]/95 backdrop-blur-md p-3 sm:p-6 overflow-hidden touch-none">
-      <div className="bg-white w-full max-w-sm sm:max-w-xl rounded-[2.2rem] sm:rounded-[2.5rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] overflow-hidden animate-in fade-in zoom-in duration-300 border border-emerald-100/20 flex flex-col h-[85vh] max-h-[620px] sm:max-h-[680px]">
+    <div 
+      className="fixed inset-0 z-[999] flex items-center justify-center bg-[#062e1e]/95 backdrop-blur-md p-3 sm:p-6 overflow-hidden select-none touch-none overscroll-none"
+      onTouchMove={(e) => {
+        // ป้องกันการลากพื้นหลังเมื่อแตะที่ฉากหลังสีเข้ม
+        if (e.target === e.currentTarget) {
+          e.preventDefault();
+        }
+      }}
+    >
+      <div className="bg-white w-full max-w-sm sm:max-w-xl rounded-[2.2rem] sm:rounded-[2.5rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.6)] overflow-hidden animate-in fade-in zoom-in duration-300 border border-emerald-100/20 flex flex-col h-[85vh] max-h-[620px] sm:max-h-[680px] overscroll-none">
         
         {/* Modern Header with Outline Logo */}
-        <div className="bg-gradient-to-br from-emerald-800 to-emerald-950 p-4 sm:p-5 text-white text-center flex-shrink-0 relative overflow-hidden">
+        <div 
+          className="bg-gradient-to-br from-emerald-800 to-emerald-950 p-4 sm:p-5 text-white text-center flex-shrink-0 relative overflow-hidden touch-none"
+          onTouchMove={(e) => e.preventDefault()}
+        >
           {/* Decorative Pattern Background */}
           <div className="absolute inset-0 opacity-10 pointer-events-none">
             <svg width="100%" height="100%"><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="white"/></pattern><rect width="100%" height="100%" fill="url(#grid)" /></svg>
@@ -128,7 +153,10 @@ const MemberSelector: React.FC<MemberSelectorProps> = ({ onSelect, onLeaderAcces
         </div>
         
         {/* Footer with Minimalist Leader Access Button */}
-        <div className="p-4 sm:p-5 bg-white border-t border-slate-100 flex-shrink-0 text-center">
+        <div 
+          className="p-4 sm:p-5 bg-white border-t border-slate-100 flex-shrink-0 text-center touch-none"
+          onTouchMove={(e) => e.preventDefault()}
+        >
           <button 
             onClick={onLeaderAccess}
             className="w-full flex items-center justify-center gap-2.5 py-3 sm:py-4 px-5 bg-emerald-50/50 text-emerald-900 text-sm sm:text-base font-black rounded-2xl transition-all border-2 border-emerald-100 hover:bg-emerald-100/50 hover:border-emerald-300 active:scale-[0.98] active:bg-emerald-200/50 shadow-sm mb-2.5 group uppercase tracking-tighter"
