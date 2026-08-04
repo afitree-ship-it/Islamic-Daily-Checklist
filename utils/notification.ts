@@ -1,7 +1,7 @@
 export interface NotificationSettings {
   enabled: boolean;
-  time: string; // HH:mm e.g. "06:00"
-  lastNotifiedDate: string; // YYYY-MM-DD
+  times: string[]; // Array of HH:mm strings, e.g. ["06:00", "15:35"]
+  lastNotifiedMap: Record<string, string>; // { "06:00": "YYYY-MM-DD", "15:35": "YYYY-MM-DD" }
 }
 
 const STORAGE_KEY = 'deen_tracker_notification_settings';
@@ -39,8 +39,8 @@ export async function requestNotificationPermission(): Promise<boolean> {
 export function getNotificationSettings(): NotificationSettings {
   const defaultSettings: NotificationSettings = {
     enabled: true,
-    time: '06:00',
-    lastNotifiedDate: ''
+    times: ['06:00', '15:35'],
+    lastNotifiedMap: {}
   };
 
   if (typeof window === 'undefined') return defaultSettings;
@@ -48,7 +48,20 @@ export function getNotificationSettings(): NotificationSettings {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
-      return { ...defaultSettings, ...JSON.parse(saved) };
+      const parsed = JSON.parse(saved);
+      // Migration & compatibility check
+      let times = parsed.times;
+      if (!times && parsed.time) {
+        times = [parsed.time];
+        if (!times.includes('15:35')) {
+          times.push('15:35');
+        }
+      }
+      return {
+        enabled: parsed.enabled ?? defaultSettings.enabled,
+        times: Array.isArray(times) && times.length > 0 ? times : defaultSettings.times,
+        lastNotifiedMap: parsed.lastNotifiedMap || {}
+      };
     }
   } catch (e) {
     console.warn('Failed to load notification settings', e);
@@ -76,7 +89,7 @@ export async function sendNotification(title: string, body: string): Promise<boo
     body,
     icon: '/icon-192.png',
     badge: '/icon-192.png',
-    tag: 'deen-tracker-reminder',
+    tag: `deen-tracker-reminder-${Date.now()}`,
     renotify: true,
   };
 
@@ -105,7 +118,7 @@ export async function sendTestNotification(): Promise<boolean> {
 
   return sendNotification(
     '🌅 ทดสอบแจ้งเตือน DeenTracker',
-    'ระบบแจ้งเตือนพร้อมใช้งาน! คุณจะได้รับการแจ้งเตือนทุกเช้า เวลา 06:00 น. เพื่อบันทึกเช็คลิสต์ความดีประจำวัน ✨'
+    'ระบบแจ้งเตือนพร้อมใช้งาน! คุณจะได้รับการแจ้งเตือนเวลา 06:00 น. และ 15:35 น. เพื่อบันทึกเช็คลิสต์ความดีประจำวัน ✨'
   );
 }
 
@@ -119,16 +132,30 @@ export function checkAndTriggerScheduledNotification(memberName?: string): void 
   const minutes = String(now.getMinutes()).padStart(2, '0');
   const currentTime = `${hours}:${minutes}`;
 
-  // Check if current time matches target time (e.g., "06:00")
-  if (currentTime === settings.time) {
-    const todayStr = now.toISOString().split('T')[0];
-    if (settings.lastNotifiedDate !== todayStr) {
-      const nameGreeting = memberName ? `คุณ${memberName}` : 'สมาชิกทุกท่าน';
-      sendNotification(
-        '🌅 แจ้งเตือนเช็คลิสต์ประจำวัน',
-        `อรุณสวัสดิ์${nameGreeting}! ได้เวลาบันทึกเช็คลิสต์ความดีประจำวันกับ DeenTracker แล้ว ขอให้อยู่ในความโปรดปรานของอัลลอฮฺ ✨`
-      );
-      saveNotificationSettings({ lastNotifiedDate: todayStr });
+  const todayStr = now.toISOString().split('T')[0];
+
+  for (const scheduledTime of settings.times) {
+    if (currentTime === scheduledTime) {
+      const lastDate = settings.lastNotifiedMap[scheduledTime];
+      if (lastDate !== todayStr) {
+        const nameGreeting = memberName ? `คุณ${memberName}` : 'สมาชิกทุกท่าน';
+        let title = `🕌 แจ้งเตือนเช็คลิสต์ประจำวัน (${scheduledTime} น.)`;
+        let body = `สวัสดีครับ${nameGreeting}! ได้เวลาบันทึกเช็คลิสต์ความดีประจำวันกับ DeenTracker แล้ว ขอให้อยู่ในความโปรดปรานของอัลลอฮฺ ✨`;
+
+        if (scheduledTime === '06:00') {
+          title = '🌅 แจ้งเตือนเช็คลิสต์ยามเช้า (06:00 น.)';
+          body = `อรุณสวัสดิ์${nameGreeting}! เริ่มต้นวันใหม่ด้วยการทำความดีและบันทึกเช็คลิสต์ประจำวันกันครับ ✨`;
+        } else if (scheduledTime === '15:35') {
+          title = '🕌 แจ้งเตือนเช็คลิสต์รอบบ่าย (15:35 น.)';
+          body = `สวัสดีตอนบ่าย${nameGreeting}! อย่าลืมมาอัปเดตเช็คลิสต์ความดีประจำวันช่วงบ่ายกันนะครับ ✨`;
+        }
+
+        sendNotification(title, body);
+
+        // Update notification history map
+        const updatedMap = { ...settings.lastNotifiedMap, [scheduledTime]: todayStr };
+        saveNotificationSettings({ lastNotifiedMap: updatedMap });
+      }
     }
   }
 }

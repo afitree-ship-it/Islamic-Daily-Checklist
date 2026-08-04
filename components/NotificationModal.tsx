@@ -18,9 +18,10 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ onClose, a
   const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>('default');
   const [settings, setSettings] = useState<NotificationSettings>({
     enabled: true,
-    time: '06:00',
-    lastNotifiedDate: ''
+    times: ['06:00', '15:35'],
+    lastNotifiedMap: {}
   });
+  const [newTimeInput, setNewTimeInput] = useState('15:35');
   const [testResult, setTestResult] = useState<string | null>(null);
   const [isTesting, setIsTesting] = useState(false);
 
@@ -47,10 +48,22 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ onClose, a
     setSettings(prev => ({ ...prev, enabled }));
   };
 
-  const handleTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const time = e.target.value;
-    saveNotificationSettings({ time });
-    setSettings(prev => ({ ...prev, time }));
+  const handleAddTime = (timeToAdd: string) => {
+    if (!timeToAdd) return;
+    if (settings.times.includes(timeToAdd)) return;
+    const updatedTimes = [...settings.times, timeToAdd].sort();
+    saveNotificationSettings({ times: updatedTimes });
+    setSettings(prev => ({ ...prev, times: updatedTimes }));
+  };
+
+  const handleRemoveTime = (timeToRemove: string) => {
+    if (settings.times.length <= 1) {
+      alert('จำเป็นต้องมีเวลาแจ้งเตือนอย่างน้อย 1 เวลา');
+      return;
+    }
+    const updatedTimes = settings.times.filter(t => t !== timeToRemove);
+    saveNotificationSettings({ times: updatedTimes });
+    setSettings(prev => ({ ...prev, times: updatedTimes }));
   };
 
   const handleTestClick = async () => {
@@ -67,19 +80,19 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ onClose, a
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 flex flex-col gap-5 relative overflow-hidden">
+      <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 flex flex-col gap-5 relative overflow-hidden max-h-[90vh] overflow-y-auto">
         
         {/* Header */}
         <div className="flex justify-between items-start">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shadow-sm">
+            <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shadow-sm shrink-0">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
             </div>
             <div>
               <h2 className="text-lg font-black text-slate-800 leading-tight">ตั้งค่าการแจ้งเตือนประจำวัน</h2>
-              <p className="text-xs text-slate-500 font-medium">เตือนเช็คลิสต์บนมือถือทุกเช้า</p>
+              <p className="text-xs text-slate-500 font-medium">เตือนเช็คลิสต์บนมือถือ (รอบเช้า & รอบบ่าย)</p>
             </div>
           </div>
           <button 
@@ -102,7 +115,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ onClose, a
             <div className="flex items-start gap-2.5">
               <span className="text-lg">🔔</span>
               <div className="text-xs text-amber-900 leading-relaxed font-medium">
-                ต้องการการอนุญาตเพื่อส่งการแจ้งเตือนเช็คลิสต์เวลา 06:00 น. บนมือถือของคุณ
+                ต้องการการอนุญาตเพื่อส่งการแจ้งเตือนเช็คลิสต์ประจำวัน (06:00 น. และ 15:35 น.) บนมือถือของคุณ
               </div>
             </div>
             <button
@@ -139,18 +152,74 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ onClose, a
             />
           </div>
 
-          <div className="flex items-center justify-between pt-2 border-t border-slate-200/60">
-            <div>
-              <div className="text-xs font-black text-slate-700">เวลาแจ้งเตือนประจำวัน</div>
-              <div className="text-[10px] text-slate-500 font-medium">กำหนดเวลาแจ้งเตือนทุกๆ เช้า</div>
+          <div className="pt-2 border-t border-slate-200/60 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs font-black text-slate-700">เวลาแจ้งเตือนในแต่ละวัน</div>
+                <div className="text-[10px] text-slate-500 font-medium">กำหนดเวลาแจ้งเตือนรายวันบนมือถือ</div>
+              </div>
             </div>
-            <input 
-              type="time" 
-              value={settings.time}
-              onChange={handleTimeChange}
-              disabled={!settings.enabled || permission !== 'granted'}
-              className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
-            />
+
+            {/* List of Notification Times */}
+            <div className="flex flex-wrap gap-2 pt-1">
+              {settings.times.map((t) => (
+                <div 
+                  key={t}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-950 text-white rounded-xl text-xs font-black shadow-sm"
+                >
+                  <span>⏰ {t} น.</span>
+                  {t === '06:00' && <span className="text-[9px] text-emerald-300 font-normal">(เช้า)</span>}
+                  {t === '15:35' && <span className="text-[9px] text-emerald-300 font-normal">(บ่าย)</span>}
+                  <button
+                    onClick={() => handleRemoveTime(t)}
+                    disabled={!settings.enabled || permission !== 'granted'}
+                    className="ml-1 text-emerald-300 hover:text-red-300 disabled:opacity-40"
+                    title="ลบเวลานี้"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Add New Time Section */}
+            <div className="flex items-center gap-2 pt-2">
+              <input 
+                type="time" 
+                value={newTimeInput}
+                onChange={(e) => setNewTimeInput(e.target.value)}
+                disabled={!settings.enabled || permission !== 'granted'}
+                className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
+              />
+              <button
+                onClick={() => handleAddTime(newTimeInput)}
+                disabled={!settings.enabled || permission !== 'granted' || !newTimeInput}
+                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-black rounded-xl transition-all shadow-sm"
+              >
+                + เพิ่มเวลาเตือน
+              </button>
+            </div>
+            
+            {/* Quick Presets */}
+            <div className="flex gap-2 text-[10px] text-slate-500 font-medium pt-1">
+              <span>ทางลัด:</span>
+              {!settings.times.includes('06:00') && (
+                <button 
+                  onClick={() => handleAddTime('06:00')} 
+                  className="text-emerald-700 underline font-bold"
+                >
+                  + 06:00 (เช้า)
+                </button>
+              )}
+              {!settings.times.includes('15:35') && (
+                <button 
+                  onClick={() => handleAddTime('15:35')} 
+                  className="text-emerald-700 underline font-bold"
+                >
+                  + 15:35 (บ่าย)
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -181,8 +250,8 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ onClose, a
             <span>💡 คำแนะนำสำหรับมือถือ:</span>
           </div>
           <p className="leading-relaxed">
-            • <strong>Android:</strong> เมื่อกดอนุญาตแจ้งเตือน การเตือนจะขึ้นที่หน้าจออัตโนมัติเวลา {settings.time} น.<br />
-            • <strong>iOS / iPhone:</strong> ให้กดปุ่ม <strong>"แชร์" (Share)</strong> ใน Safari แล้วเลือก <strong>"เพิ่มไปยังหน้าจอโฮม" (Add to Home Screen)</strong> เพื่อเปิดรับการแจ้งเตือนเต็มรูปแบบ
+            • <strong>Android:</strong> เมื่อเปิดอนุญาต การแจ้งเตือนจะขึ้นตรงตามเวลาที่ตั้งไว้ (06:00 น. และ 15:35 น.)<br />
+            • <strong>iOS / iPhone:</strong> ให้กดปุ่ม <strong>"แชร์" (Share)</strong> ใน Safari แล้วเลือก <strong>"เพิ่มไปยังหน้าจอโฮม" (Add to Home Screen)</strong> เพื่อเปิดรับการแจ้งเตือนบนมือถือ
           </p>
         </div>
 
