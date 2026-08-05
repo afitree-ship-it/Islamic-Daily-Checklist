@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { MEMBERS } from '../constants';
 import { Member } from '../types';
@@ -57,67 +56,56 @@ const MemberSelector: React.FC<MemberSelectorProps> = ({ onSelect, onLeaderAcces
               <div className="absolute inset-[-3px] rounded-full border border-emerald-400/30 border-dashed animate-rotate-slow pointer-events-none" />
               <div className="absolute inset-[-8px] rounded-full border border-amber-300/25 border-dotted animate-rotate-slow-reverse pointer-events-none" />
 
-              {/* Core Breathing Logo Badge */}
-              <div className="relative w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-emerald-700/90 via-emerald-900 to-emerald-950 rounded-2xl flex items-center justify-center border-2 border-emerald-300/40 shadow-[0_8px_20px_-4px_rgba(16,185,129,0.5)] backdrop-blur-md animate-logo-breath overflow-hidden">
-                
-                {/* Subtle Inner Ambient Glow */}
-                <div className="absolute inset-0 bg-gradient-to-t from-emerald-500/10 via-transparent to-white/10 pointer-events-none" />
+              {/* Icon only - no square badge background, just the checkmark + crescent SVG */}
+              <svg className="relative w-14 h-14 sm:w-16 sm:h-16 drop-shadow-[0_4px_12px_rgba(52,211,153,0.8)] animate-logo-breath" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="checkGrad" x1="6" y1="16" x2="26" y2="16" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stopColor="#ffffff" />
+                    <stop offset="60%" stopColor="#6ee7b7" />
+                    <stop offset="100%" stopColor="#fde047" />
+                  </linearGradient>
+                  <linearGradient id="crescentGrad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stopColor="#34d399" stopOpacity="0.8" />
+                    <stop offset="100%" stopColor="#059669" stopOpacity="0.2" />
+                  </linearGradient>
+                </defs>
 
-                {/* Main Logo SVG Icon - Stylish Crescent Shield with Modern Bold Checkmark */}
-                <svg className="w-8 h-8 sm:w-9 sm:h-9 drop-shadow-[0_4px_12px_rgba(52,211,153,0.8)]" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <defs>
-                    <linearGradient id="checkGrad" x1="6" y1="16" x2="26" y2="16" gradientUnits="userSpaceOnUse">
-                      <stop offset="0%" stopColor="#ffffff" />
-                      <stop offset="60%" stopColor="#6ee7b7" />
-                      <stop offset="100%" stopColor="#fde047" />
-                    </linearGradient>
-                    <linearGradient id="crescentGrad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-                      <stop offset="0%" stopColor="#34d399" stopOpacity="0.8" />
-                      <stop offset="100%" stopColor="#059669" stopOpacity="0.2" />
-                    </linearGradient>
-                  </defs>
+                {/* Decorative Background Crescent Motif */}
+                <path 
+                  d="M17 3.5C11.2 3.5 6.5 8.2 6.5 14C6.5 19.8 11.2 24.5 17 24.5C19.5 24.5 21.8 23.6 23.6 22.1C20.8 23.3 17.5 23 15 21C11.8 18.4 11.2 13.7 13.8 10.5C15.1 8.9 17 8 19 8C20 8 21 8.2 22 8.7C20.6 5.5 19 3.5 17 3.5Z" 
+                  fill="url(#crescentGrad)"
+                  className="opacity-70"
+                />
 
-                  {/* Decorative Background Crescent Motif */}
-                  <path 
-                    d="M17 3.5C11.2 3.5 6.5 8.2 6.5 14C6.5 19.8 11.2 24.5 17 24.5C19.5 24.5 21.8 23.6 23.6 22.1C20.8 23.3 17.5 23 15 21C11.8 18.4 11.2 13.7 13.8 10.5C15.1 8.9 17 8 19 8C20 8 21 8.2 22 8.7C20.6 5.5 19 3.5 17 3.5Z" 
-                    fill="url(#crescentGrad)"
-                    className="opacity-70"
-                  />
+                {/* Star Accent on Top Right */}
+                <path 
+                  d="M23.5 4.5L24.3 6.2L26 7L24.3 7.8L23.5 9.5L22.7 7.8L21 7L22.7 6.2L23.5 4.5Z" 
+                  fill="#fde047" 
+                  className="animate-pulse"
+                />
 
-                  {/* Star Accent on Top Right */}
-                  <path 
-                    d="M23.5 4.5L24.3 6.2L26 7L24.3 7.8L23.5 9.5L22.7 7.8L21 7L22.7 6.2L23.5 4.5Z" 
-                    fill="#fde047" 
-                    className="animate-pulse"
-                  />
+                {/* Outer Glowing Circle Guide */}
+                <circle cx="16" cy="16" r="13.5" stroke="#34d399" strokeWidth="1.2" strokeDasharray="3 3" opacity="0.4" />
 
-                  {/* Outer Glowing Circle Guide */}
-                  <circle cx="16" cy="16" r="13.5" stroke="#34d399" strokeWidth="1.2" strokeDasharray="3 3" opacity="0.4" />
+                {/* Main Stylish Bold Ribbon Checkmark */}
+                <path 
+                  d="M8.5 16.5L13.2 21.2C13.6 21.6 14.3 21.6 14.7 21.2L24.5 10.5" 
+                  stroke="url(#checkGrad)" 
+                  strokeWidth="3.6" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                />
 
-                  {/* Main Stylish Bold Ribbon Checkmark */}
-                  <path 
-                    d="M8.5 16.5L13.2 21.2C13.6 21.6 14.3 21.6 14.7 21.2L24.5 10.5" 
-                    stroke="url(#checkGrad)" 
-                    strokeWidth="3.6" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                  />
-
-                  {/* Highlight Glow Accent Line on Checkmark */}
-                  <path 
-                    d="M9.5 16.5L13.2 20.2L23.5 10" 
-                    stroke="#ffffff" 
-                    strokeWidth="1.2" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                    opacity="0.9"
-                  />
-                </svg>
-
-                {/* Subtle Corner Sparkle */}
-                <div className="absolute top-1 right-1 w-1.5 h-1.5 bg-amber-300 rounded-full animate-ping opacity-75" />
-                <div className="absolute bottom-1.5 left-1.5 w-1 h-1 bg-emerald-300 rounded-full animate-pulse" />
-              </div>
+                {/* Highlight Glow Accent Line on Checkmark */}
+                <path 
+                  d="M9.5 16.5L13.2 20.2L23.5 10" 
+                  stroke="#ffffff" 
+                  strokeWidth="1.2" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  opacity="0.9"
+                />
+              </svg>
             </div>
             
             <div className="flex flex-col items-center mx-auto w-fit">
