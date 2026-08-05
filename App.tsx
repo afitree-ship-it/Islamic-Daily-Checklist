@@ -32,6 +32,18 @@ const App: React.FC = () => {
     const updated = [...members, newMember];
     setMembers(updated);
     saveStoredMembers(updated);
+
+    // ส่งข้อมูลจำลองไปที่ Google Sheets เพื่อให้เครื่องอื่นมองเห็นชื่อสมาชิกล่าสุดได้ทันทีผ่านการซิงค์
+    const initSyncItem: SyncQueueItem = {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+      date: new Date().toISOString().split('T')[0],
+      memberId: trimmed,
+      taskId: 'sync_member_init',
+      status: false,
+      timestamp: Date.now()
+    };
+    setSyncQueue(q => [...q, initSyncItem]);
+
     return true;
   };
 
@@ -117,10 +129,14 @@ const App: React.FC = () => {
 
     let hasChanged = false;
     const nextLocal = { ...progressRef.current };
+    
+    // Set for keeping track of any members we find in the remote data
+    const remoteMembersSet = new Set<string>();
 
     Object.keys(remote).forEach(date => {
       if (!nextLocal[date]) nextLocal[date] = {};
       Object.keys(remote[date]).forEach(mId => {
+        remoteMembersSet.add(mId); // Track member ID
         if (!nextLocal[date][mId]) nextLocal[date][mId] = {};
         Object.keys(remote[date][mId]).forEach(tId => {
           const interactionKey = `${date}|${mId}|${tId}`;
@@ -136,6 +152,25 @@ const App: React.FC = () => {
         });
       });
     });
+
+    // Update members list if new members are found from sync
+    if (remoteMembersSet.size > 0) {
+      setMembers(prevMembers => {
+        let membersChanged = false;
+        const newMembers = [...prevMembers];
+        remoteMembersSet.forEach(mId => {
+          if (!newMembers.some(m => m.id === mId)) {
+            newMembers.push({ id: mId, name: mId, avatar: '👤' });
+            membersChanged = true;
+          }
+        });
+        if (membersChanged) {
+          saveStoredMembers(newMembers);
+          return newMembers;
+        }
+        return prevMembers;
+      });
+    }
 
     if (hasChanged) {
       progressRef.current = nextLocal;
