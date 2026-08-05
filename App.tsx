@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ChecklistTable from './components/ChecklistTable';
 import StatsPanel from './components/StatsPanel';
@@ -370,13 +369,30 @@ const App: React.FC = () => {
     };
   }, [syncQueue.length, processQueue]);
 
+  // ===== แก้ไขจุดนี้: ลด interval จาก 60 วิ เหลือ 15 วิ + เพิ่มการดึงข้อมูลทันทีเมื่อกลับมาเปิดแอป =====
   useEffect(() => {
     loadGlobalData();
+
     const interval = setInterval(() => {
       if (syncQueue.length === 0 && !isProcessingQueue.current) loadGlobalData(true);
-    }, 60000); 
-    return () => clearInterval(interval);
+    }, 8000); // เดิม 60000 (60 วิ) ลดเหลือ 8000 (8 วิ) เพื่อให้เห็นข้อมูลใหม่เร็วขึ้น
+
+    // ดึงข้อมูลทันทีทุกครั้งที่ผู้ใช้กลับมาเปิดหน้าจอ/สลับแท็บกลับมา (สำคัญมากบนมือถือ)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadGlobalData(true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleVisibility);
+    };
   }, [loadGlobalData, syncQueue.length]);
+  // ===== จบส่วนที่แก้ไข =====
 
   const handleToggle = useCallback((date: string, memberId: string, taskId: string) => {
     // ป้องกันการกดถ้าไม่ได้เลือกชื่อตนเอง
