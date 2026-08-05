@@ -55,28 +55,16 @@ const App: React.FC = () => {
       status: true,
       timestamp: Date.now()
     };
-    // ลบล้างค่าสถานะการลบด้วยถ้าเคยถูกลบไป
-    const undeleteSyncItem: SyncQueueItem = {
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 6),
-      date: new Date().toISOString().split('T')[0],
-      memberId: trimmed,
-      taskId: 'sync_member_delete',
-      status: false,
-      timestamp: Date.now()
-    };
-    setSyncQueue(q => [...q, initSyncItem, undeleteSyncItem]);
+    setSyncQueue(q => [...q, initSyncItem]);
 
     return true;
   };
 
   const handleDeleteMember = (memberId: string): boolean => {
     if (members.length <= 1) {
-      alert('จำเป็นต้องมีสมาชิกในระบบอย่างน้อย 1 คน');
-      return false;
+      return false; // UI should handle error message
     }
     const memberObj = members.find(m => m.id === memberId);
-    const confirmDelete = window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบสมาชิก "${memberObj?.name || memberId}" ออกจากระบบ?`);
-    if (!confirmDelete) return false;
 
     const updated = members.filter(m => m.id !== memberId);
     setMembers(updated);
@@ -162,7 +150,7 @@ const App: React.FC = () => {
   }, [syncQueue]);
 
   // ฟังก์ชันผสานข้อมูลจาก Server โดยเคารพข้อมูลที่เพิ่งกดล่าสุด (Grace Period)
-  const mergeProgress = useCallback((remote: ProgressData) => {
+  const mergeProgress = useCallback((remote: ProgressData, remoteActiveMembers?: string[]) => {
     const now = Date.now();
     const GRACE_PERIOD = 20000; // 20 วินาที เพื่อความชัวร์ว่า Google Sheets ทันอัปเดต
 
@@ -203,7 +191,40 @@ const App: React.FC = () => {
     });
 
     // Update members list if new members are found from sync
-    if (remoteMembersSet.size > 0) {
+    if (remoteActiveMembers) {
+      setMembers(prevMembers => {
+        let membersChanged = false;
+        const newMembers = [...prevMembers];
+        
+        // Read pending queue to prevent deleting members that are waiting to be synced
+        const pendingQueue: SyncQueueItem[] = JSON.parse(localStorage.getItem('deen_sync_queue') || '[]');
+        const pendingInitMembers = new Set(pendingQueue.filter(q => q.taskId === 'sync_member_init').map(q => q.memberId));
+        const pendingDeleteMembers = new Set(pendingQueue.filter(q => q.taskId === 'sync_member_delete').map(q => q.memberId));
+        
+        // Remove members that are NOT in remoteActiveMembers (and not pending init)
+        for (let i = newMembers.length - 1; i >= 0; i--) {
+          const mId = newMembers[i].id;
+          if (!remoteActiveMembers.includes(mId) && !pendingInitMembers.has(mId)) {
+            newMembers.splice(i, 1);
+            membersChanged = true;
+          }
+        }
+        
+        // Add members that are IN remoteActiveMembers (and not pending delete)
+        remoteActiveMembers.forEach(mId => {
+          if (!newMembers.some(m => m.id === mId) && !pendingDeleteMembers.has(mId)) {
+            newMembers.push({ id: mId, name: mId, avatar: '👤' });
+            membersChanged = true;
+          }
+        });
+        
+        if (membersChanged) {
+          saveStoredMembers(newMembers);
+          return newMembers;
+        }
+        return prevMembers;
+      });
+    } else if (remoteMembersSet.size > 0) {
       setMembers(prevMembers => {
         let membersChanged = false;
         const newMembers = [...prevMembers];
@@ -241,6 +262,30 @@ const App: React.FC = () => {
       });
     }
 
+    // ซิงค์สมาชิกที่มีอยู่ในเครื่องแต่ไม่มีใน Google Sheets (เมื่อไม่มี remoteActiveMembers)
+    if (!remoteActiveMembers) {
+      const storedMembers = getStoredMembers();
+      const localDeleted = getDeletedMembers();
+      const missingInRemote = storedMembers.filter(m => !remoteMembersSet.has(m.id) && !localDeleted.includes(m.id));
+      
+      if (missingInRemote.length > 0) {
+        const today = new Date().toISOString().split('T')[0];
+        const newSyncItems: SyncQueueItem[] = missingInRemote.map(m => ({
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 6),
+          date: today,
+          memberId: m.id,
+          taskId: 'sync_member_init',
+          status: true,
+          timestamp: Date.now()
+        }));
+        setSyncQueue(q => {
+          const existingInitMemberIds = new Set(q.filter(item => item.taskId === 'sync_member_init').map(item => item.memberId));
+          const filteredNewSyncItems = newSyncItems.filter(item => !existingInitMemberIds.has(item.memberId));
+          return filteredNewSyncItems.length > 0 ? [...q, ...filteredNewSyncItems] : q;
+        });
+      }
+    }
+
     if (hasChanged) {
       progressRef.current = nextLocal;
       localStorage.setItem('deen_tracker_v1', JSON.stringify(nextLocal));
@@ -255,7 +300,7 @@ const App: React.FC = () => {
     try {
       const remoteData = await fetchProgressFromSheets();
       if (remoteData) {
-        mergeProgress(remoteData);
+        mergeProgress(remoteData.progress, remoteData.activeMembers);
         if (!isSilent) setSyncStatus('success');
       }
     } catch (err) {
