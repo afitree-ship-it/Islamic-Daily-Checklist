@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { MEMBERS, TASKS, getTaskPoints } from '../constants';
-import { ProgressData, SyncQueueItem, Task } from '../types';
+import { ProgressData, SyncQueueItem, Task, Member } from '../types';
 import { playCheckSound } from '../utils/audio';
 
 interface ChecklistTableProps {
@@ -12,6 +12,7 @@ interface ChecklistTableProps {
   onToggle: (date: string, memberId: string, taskId: string) => void;
   onOpenSelector: () => void;
   syncQueue: SyncQueueItem[];
+  members?: Member[];
 }
 
 const TaskButton = React.memo(({ 
@@ -124,7 +125,8 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
   activeMemberId, 
   onToggle, 
   onOpenSelector,
-  syncQueue
+  syncQueue,
+  members
 }) => {
   const dailyProgress = progress[currentDate] || {};
 
@@ -147,15 +149,17 @@ const ChecklistTable: React.FC<ChecklistTableProps> = ({
     }
   }, [currentDate]);
 
+  const memberList = members || MEMBERS;
+
   const sortedMembers = useMemo(() => {
-    if (!activeMemberId) return MEMBERS;
-    const activeIndex = MEMBERS.findIndex(m => m.id === activeMemberId);
-    if (activeIndex === -1) return MEMBERS;
+    if (!activeMemberId) return memberList;
+    const activeIndex = memberList.findIndex(m => m.id === activeMemberId);
+    if (activeIndex === -1) return memberList;
     
-    const others = [...MEMBERS];
+    const others = [...memberList];
     const active = others.splice(activeIndex, 1)[0];
     return [active, ...others];
-  }, [activeMemberId]);
+  }, [activeMemberId, memberList]);
 
   const getSyncState = (memberId: string, taskId: string) => {
     return syncQueue.some(q => q.date === currentDate && q.memberId === memberId && q.taskId === taskId);

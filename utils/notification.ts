@@ -64,7 +64,7 @@ export function getNotificationSettings(): NotificationSettings {
   const defaultSettings: NotificationSettings = {
     enabled: true,
     soundEnabled: true,
-    times: ['06:00', '15:35'],
+    times: ['06:00'],
     lastNotifiedMap: {}
   };
 
@@ -77,9 +77,6 @@ export function getNotificationSettings(): NotificationSettings {
       let times = parsed.times;
       if (!times && parsed.time) {
         times = [parsed.time];
-        if (!times.includes('15:35')) {
-          times.push('15:35');
-        }
       }
       return {
         enabled: parsed.enabled ?? defaultSettings.enabled,
@@ -186,7 +183,7 @@ export async function sendTestNotification(): Promise<boolean> {
   
   return sendNotification(
     '🌅 ทดสอบแจ้งเตือน DeenTracker',
-    'ระบบแจ้งเตือนพร้อมใช้งาน! คุณจะได้รับการแจ้งเตือนเวลา 06:00 น. และ 15:35 น. เพื่อบันทึกเช็คลิสต์ความดีประจำวัน ✨'
+    'ระบบแจ้งเตือนพร้อมใช้งาน! คุณจะได้รับการแจ้งเตือนเวลา 06:00 น. ของทุกวัน เพื่อบันทึกเช็คลิสต์ความดีประจำวัน ✨'
   );
 }
 

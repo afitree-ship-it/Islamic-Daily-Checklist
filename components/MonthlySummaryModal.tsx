@@ -1,18 +1,20 @@
 
 import React, { useMemo } from 'react';
 import { MEMBERS, TASKS, getTaskPoints } from '../constants';
-import { ProgressData, MonthlyMemberStats } from '../types';
+import { ProgressData, MonthlyMemberStats, Member } from '../types';
 
 interface MonthlySummaryModalProps {
   progress: ProgressData;
   onClose: () => void;
+  members?: Member[];
 }
 
-const MonthlySummaryModal: React.FC<MonthlySummaryModalProps> = ({ progress, onClose }) => {
+const MonthlySummaryModal: React.FC<MonthlySummaryModalProps> = ({ progress, onClose, members }) => {
+  const memberList = members || MEMBERS;
   const currentMonth = new Date().toISOString().slice(0, 7); 
 
   const monthlyStats = useMemo(() => {
-    const stats: MonthlyMemberStats[] = MEMBERS.map(member => {
+    const stats: MonthlyMemberStats[] = memberList.map(member => {
       let totalCompleted = 0;
       let totalPossible = 0;
       let totalCompletedScore = 0;

@@ -4,7 +4,7 @@ import { Task, Member } from './types';
 // ใช้ไอคอนบุคคลแบบมินิมอลเหมือนกันทุกคนตามคำขอ
 const MINIMAL_AVATAR = '👤';
 
-export const MEMBERS: Member[] = [
+export const INITIAL_MEMBERS: Member[] = [
   { id: 'อฟิตรี', name: 'อฟิตรี', avatar: MINIMAL_AVATAR },
   { id: 'อนันต์', name: 'อนันต์', avatar: MINIMAL_AVATAR },
   { id: 'กูรีดวน', name: 'กูรีดวน', avatar: MINIMAL_AVATAR },
@@ -13,6 +13,32 @@ export const MEMBERS: Member[] = [
   { id: 'ซอลาฮุดดีน', name: 'ซอลาฮุดดีน', avatar: MINIMAL_AVATAR },
   { id: 'อัฟฟาน', name: 'อัฟฟาน', avatar: MINIMAL_AVATAR },
 ];
+
+export const getStoredMembers = (): Member[] => {
+  if (typeof window === 'undefined') return INITIAL_MEMBERS;
+  try {
+    const saved = localStorage.getItem('deen_tracker_members');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('Failed to parse deen_tracker_members:', e);
+  }
+  return INITIAL_MEMBERS;
+};
+
+export const saveStoredMembers = (members: Member[]): void => {
+  try {
+    localStorage.setItem('deen_tracker_members', JSON.stringify(members));
+  } catch (e) {
+    console.warn('Failed to save deen_tracker_members:', e);
+  }
+};
+
+export const MEMBERS: Member[] = INITIAL_MEMBERS;
 
 export const TASKS: Task[] = [
   { id: 't1', label: 'ซุบฮิ ญะมาอะฮฺ', category: 'prayer' },

@@ -25,7 +25,7 @@ export const NotificationModal: React.FC<NotificationModalProps> = ({ onClose, a
   const [settings, setSettings] = useState<NotificationSettings>({
     enabled: true,
     soundEnabled: true,
-    times: ['06:00', '15:35'],
+    times: ['06:00'],
     lastNotifiedMap: {}
   });
   const [newTimeInput, setNewTimeInput] = useState('15:35');

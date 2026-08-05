@@ -6,9 +6,11 @@ import { Member } from '../types';
 interface MemberSelectorProps {
   onSelect: (member: Member) => void;
   onLeaderAccess: () => void;
+  members?: Member[];
 }
 
-const MemberSelector: React.FC<MemberSelectorProps> = ({ onSelect, onLeaderAccess }) => {
+const MemberSelector: React.FC<MemberSelectorProps> = ({ onSelect, onLeaderAccess, members }) => {
+  const memberList = members || MEMBERS;
   // ล็อคการเลื่อนของ Body และป้องกันการสั่น/เด้งของพื้นหลัง (Overscroll/Elastic bounce on Mobile)
   useEffect(() => {
     const originalOverflow = document.body.style.overflow;
@@ -133,7 +135,7 @@ const MemberSelector: React.FC<MemberSelectorProps> = ({ onSelect, onLeaderAcces
         
         {/* Member Grid - Scrollable Member List Area */}
         <div className="p-4 sm:p-6 grid grid-cols-3 sm:grid-cols-4 gap-2.5 sm:gap-3.5 bg-slate-50/50 flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y scrollbar-hide">
-          {MEMBERS.map((member) => (
+          {memberList.map((member) => (
             <button
               key={member.id}
               onClick={() => onSelect(member)}
@@ -169,7 +171,12 @@ const MemberSelector: React.FC<MemberSelectorProps> = ({ onSelect, onLeaderAcces
             แผงควบคุมหัวหน้า
           </button>
           
-          <p className="text-[9px] text-slate-300 uppercase font-bold tracking-tight">DeenTracker v2.0 • Digital Management Suite</p>
+          <div className="flex flex-col gap-1">
+            <p className="text-[9px] text-slate-300 uppercase font-bold tracking-tight">DeenTracker v2.0 • Digital Management Suite</p>
+            <p className="text-[6px] sm:text-[7px] font-bold text-slate-300 uppercase tracking-widest italic leading-none">
+              Create & Design By: Afitree Yamaenoh
+            </p>
+          </div>
         </div>
       </div>
     </div>

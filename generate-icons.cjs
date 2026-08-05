@@ -1,0 +1,5 @@
+const fs = require('fs');
+
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="#022c22"/><text x="50" y="65" font-size="50" text-anchor="middle" fill="#34d399">🕌</text></svg>`;
+
+fs.writeFileSync('public/icon.svg', svg);

@@ -9,12 +9,50 @@ import { NotificationModal } from './components/NotificationModal';
 import { ProgressData, DailyReflection, Member, SyncQueueItem } from './types';
 import { getDailyMotivation } from './services/geminiService';
 import { fetchProgressFromSheets, syncBatchToSheets } from './services/sheetService';
-import { TASKS } from './constants';
-import { checkAndTriggerScheduledNotification } from './utils/notification';
+import { TASKS, getStoredMembers, saveStoredMembers } from './constants';
+import { checkAndTriggerScheduledNotification, requestNotificationPermission } from './utils/notification';
 
 const App: React.FC = () => {
   const [currentDate, setCurrentDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [members, setMembers] = useState<Member[]>(() => getStoredMembers());
   const [activeMember, setActiveMember] = useState<Member | null>(null);
+
+  const handleAddMember = (name: string): boolean => {
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+    if (members.some(m => m.name.toLowerCase() === trimmed.toLowerCase())) {
+      alert(`มีชื่อสมาชิก "${trimmed}" อยู่ในระบบแล้ว`);
+      return false;
+    }
+    const newMember: Member = {
+      id: trimmed,
+      name: trimmed,
+      avatar: '👤'
+    };
+    const updated = [...members, newMember];
+    setMembers(updated);
+    saveStoredMembers(updated);
+    return true;
+  };
+
+  const handleDeleteMember = (memberId: string): boolean => {
+    if (members.length <= 1) {
+      alert('จำเป็นต้องมีสมาชิกในระบบอย่างน้อย 1 คน');
+      return false;
+    }
+    const memberObj = members.find(m => m.id === memberId);
+    const confirmDelete = window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบสมาชิก "${memberObj?.name || memberId}" ออกจากระบบ?`);
+    if (!confirmDelete) return false;
+
+    const updated = members.filter(m => m.id !== memberId);
+    setMembers(updated);
+    saveStoredMembers(updated);
+
+    if (activeMember?.id === memberId) {
+      setActiveMember(null);
+    }
+    return true;
+  };
   const [showMemberSelector, setShowMemberSelector] = useState(true);
   const [showCelebration, setShowCelebration] = useState(false);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
@@ -255,9 +293,18 @@ const App: React.FC = () => {
     return () => { isMounted = false; };
   }, [currentDate, activeMember?.id]);
 
-  const handleMemberSelect = (m: Member) => {
+  const handleMemberSelect = async (m: Member) => {
     setActiveMember(m);
     setShowMemberSelector(false);
+    
+    // Request notification permission immediately if not already granted/denied
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      try {
+        await requestNotificationPermission();
+      } catch (e) {
+        console.warn('Failed to request notification permission:', e);
+      }
+    }
   };
 
   return (
@@ -271,13 +318,24 @@ const App: React.FC = () => {
 
       {showMemberSelector && (
         <MemberSelector 
+          members={members}
           onSelect={handleMemberSelect} 
           onLeaderAccess={() => { setShowMemberSelector(false); setShowLeaderSummary(true); }}
         />
       )}
       
       {showLeaderSummary && (
-        <LeaderSummaryModal currentDate={currentDate} progress={progress} onClose={() => setShowLeaderSummary(false)} />
+        <LeaderSummaryModal 
+          currentDate={currentDate} 
+          progress={progress} 
+          members={members}
+          onAddMember={handleAddMember}
+          onDeleteMember={handleDeleteMember}
+          onClose={() => { 
+            setShowLeaderSummary(false); 
+            setShowMemberSelector(true); 
+          }} 
+        />
       )}
 
       {showCelebration && (
@@ -306,9 +364,6 @@ const App: React.FC = () => {
             </div>
             <div className="flex flex-col items-start min-w-0">
               <h1 className="text-base font-black tracking-tight leading-none">DEENTRACKER</h1>
-              <p className="text-[5px] text-white/30 font-bold whitespace-nowrap leading-none mt-1 uppercase w-full" style={{ textAlignLast: 'justify' }}>
-                Create & Design By: Afitree Yamaenoh
-              </p>
             </div>
           </div>
           
@@ -388,9 +443,10 @@ const App: React.FC = () => {
           onToggle={handleToggle}
           onOpenSelector={() => setShowMemberSelector(true)}
           syncQueue={syncQueue}
+          members={members}
         />
         
-        <StatsPanel currentDate={currentDate} progress={progress} />
+        <StatsPanel currentDate={currentDate} progress={progress} members={members} />
       </main>
 
       {syncStatus === 'error' && (

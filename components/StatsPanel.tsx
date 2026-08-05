@@ -2,15 +2,17 @@
 import React, { useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { MEMBERS, TASKS, getTaskPoints } from '../constants';
-import { ProgressData } from '../types';
+import { ProgressData, Member } from '../types';
 import MonthlySummaryModal from './MonthlySummaryModal';
 
 interface StatsPanelProps {
   currentDate: string;
   progress: ProgressData;
+  members?: Member[];
 }
 
-const StatsPanel: React.FC<StatsPanelProps> = ({ currentDate, progress }) => {
+const StatsPanel: React.FC<StatsPanelProps> = ({ currentDate, progress, members }) => {
+  const memberList = members || MEMBERS;
   const [showMonthly, setShowMonthly] = useState(false);
   const dailyProgress = progress[currentDate] || {};
 
@@ -19,7 +21,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ currentDate, progress }) => {
   }, []);
 
   const chartData = useMemo(() => {
-    return MEMBERS.map(member => {
+    return memberList.map(member => {
       const memberChecks = dailyProgress[member.id] || {};
       const completedCount = Object.values(memberChecks).filter(v => v).length;
       const score = Object.keys(memberChecks).reduce((sum, tId) => {
@@ -35,7 +37,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ currentDate, progress }) => {
         total: TASKS.length
       };
     });
-  }, [dailyProgress]);
+  }, [dailyProgress, memberList]);
 
   const COLORS = ['#10b981', '#059669', '#047857', '#065f46', '#064e3b', '#34d399', '#6ee7b7', '#a7f3d0'];
 
@@ -99,7 +101,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ currentDate, progress }) => {
         <div className="p-4 bg-emerald-900 text-white rounded-2xl shadow-lg shadow-emerald-100 flex flex-col justify-center">
             <p className="text-[8px] font-black uppercase tracking-widest opacity-60 mb-1">ภาพรวมกลุ่ม (คะแนน)</p>
             <p className="text-2xl font-black">
-                {Math.round((chartData.reduce((acc, curr) => acc + curr.score, 0) / (MEMBERS.length * maxScore)) * 100)}%
+                {Math.round((chartData.reduce((acc, curr) => acc + curr.score, 0) / Math.max(1, memberList.length * maxScore)) * 100)}%
             </p>
         </div>
         <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
@@ -108,7 +110,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ currentDate, progress }) => {
         </div>
         <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
             <p className="text-[8px] text-slate-400 font-black uppercase tracking-widest mb-1">สมาชิก</p>
-            <p className="text-xl font-black text-slate-700">{MEMBERS.length}</p>
+            <p className="text-xl font-black text-slate-700">{memberList.length}</p>
         </div>
         <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
             <p className="text-[8px] text-amber-600 font-black uppercase tracking-widest mb-1">สถานะ</p>
@@ -117,7 +119,7 @@ const StatsPanel: React.FC<StatsPanelProps> = ({ currentDate, progress }) => {
       </div>
 
       {showMonthly && (
-        <MonthlySummaryModal progress={progress} onClose={() => setShowMonthly(false)} />
+        <MonthlySummaryModal progress={progress} members={memberList} onClose={() => setShowMonthly(false)} />
       )}
     </div>
   );
