@@ -147,7 +147,7 @@ const LeaderSummaryModal: React.FC<LeaderSummaryModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center bg-slate-900/90 backdrop-blur-md p-2 pt-14 md:p-4 md:pt-16">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/90 backdrop-blur-md p-2 md:p-4">
       <div className="bg-white w-full max-w-7xl max-h-[92vh] rounded-[2rem] shadow-2xl overflow-hidden flex flex-col animate-in fade-in slide-in-from-top-10 duration-500 border border-white/20">
         
         {/* Header Section */}
