@@ -17,6 +17,13 @@ const App: React.FC = () => {
   const [members, setMembers] = useState<Member[]>(() => getStoredMembers());
   const [activeMember, setActiveMember] = useState<Member | null>(null);
 
+  // ป้องกันกรณีที่ activeMember ถูกลบออกไปจากระบบ (เช่น การซิงค์จากเครื่องอื่น)
+  useEffect(() => {
+    if (activeMember && !members.some(m => m.id === activeMember.id)) {
+      setActiveMember(null);
+    }
+  }, [members, activeMember]);
+
   const handleAddMember = (name: string): boolean => {
     const trimmed = name.trim();
     if (!trimmed) return false;
