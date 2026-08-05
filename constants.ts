@@ -38,6 +38,25 @@ export const saveStoredMembers = (members: Member[]): void => {
   }
 };
 
+export const getDeletedMembers = (): string[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const saved = localStorage.getItem('deen_tracker_deleted_members');
+    return saved ? JSON.parse(saved) : [];
+  } catch (e) {
+    console.warn('Failed to parse deen_tracker_deleted_members:', e);
+    return [];
+  }
+};
+
+export const saveDeletedMembers = (memberIds: string[]): void => {
+  try {
+    localStorage.setItem('deen_tracker_deleted_members', JSON.stringify(memberIds));
+  } catch (e) {
+    console.warn('Failed to save deen_tracker_deleted_members:', e);
+  }
+};
+
 export const MEMBERS: Member[] = INITIAL_MEMBERS;
 
 export const TASKS: Task[] = [

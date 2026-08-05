@@ -9,7 +9,7 @@ import { NotificationModal } from './components/NotificationModal';
 import { ProgressData, DailyReflection, Member, SyncQueueItem } from './types';
 import { getDailyMotivation } from './services/geminiService';
 import { fetchProgressFromSheets, syncBatchToSheets } from './services/sheetService';
-import { TASKS, getStoredMembers, saveStoredMembers } from './constants';
+import { TASKS, getStoredMembers, saveStoredMembers, getDeletedMembers, saveDeletedMembers } from './constants';
 import { checkAndTriggerScheduledNotification, requestNotificationPermission } from './utils/notification';
 
 const App: React.FC = () => {
@@ -33,16 +33,31 @@ const App: React.FC = () => {
     setMembers(updated);
     saveStoredMembers(updated);
 
+    // ลบออกจากรายการที่เคยถูกลบในเครื่องนี้ (ถ้ามี)
+    const deletedLocally = getDeletedMembers();
+    if (deletedLocally.includes(trimmed)) {
+      saveDeletedMembers(deletedLocally.filter(id => id !== trimmed));
+    }
+
     // ส่งข้อมูลจำลองไปที่ Google Sheets เพื่อให้เครื่องอื่นมองเห็นชื่อสมาชิกล่าสุดได้ทันทีผ่านการซิงค์
     const initSyncItem: SyncQueueItem = {
       id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
       date: new Date().toISOString().split('T')[0],
       memberId: trimmed,
       taskId: 'sync_member_init',
+      status: true,
+      timestamp: Date.now()
+    };
+    // ลบล้างค่าสถานะการลบด้วยถ้าเคยถูกลบไป
+    const undeleteSyncItem: SyncQueueItem = {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 6),
+      date: new Date().toISOString().split('T')[0],
+      memberId: trimmed,
+      taskId: 'sync_member_delete',
       status: false,
       timestamp: Date.now()
     };
-    setSyncQueue(q => [...q, initSyncItem]);
+    setSyncQueue(q => [...q, initSyncItem, undeleteSyncItem]);
 
     return true;
   };
@@ -59,6 +74,23 @@ const App: React.FC = () => {
     const updated = members.filter(m => m.id !== memberId);
     setMembers(updated);
     saveStoredMembers(updated);
+    
+    // บันทึกลงเครื่องว่าถูกลบ จะได้ไม่ดึงกลับมาใหม่
+    const deletedLocally = getDeletedMembers();
+    if (!deletedLocally.includes(memberId)) {
+      saveDeletedMembers([...deletedLocally, memberId]);
+    }
+
+    // แจ้งเตือนไปยัง Sheet ว่าลบแล้ว (เครื่องอื่นจะได้อัพเดทตาม)
+    const deleteSyncItem: SyncQueueItem = {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+      date: new Date().toISOString().split('T')[0],
+      memberId: memberId,
+      taskId: 'sync_member_delete',
+      status: true,
+      timestamp: Date.now()
+    };
+    setSyncQueue(q => [...q, deleteSyncItem]);
 
     if (activeMember?.id === memberId) {
       setActiveMember(null);
@@ -132,11 +164,21 @@ const App: React.FC = () => {
     
     // Set for keeping track of any members we find in the remote data
     const remoteMembersSet = new Set<string>();
+    const memberDeleteStatus: Record<string, { date: string, deleted: boolean }> = {};
 
     Object.keys(remote).forEach(date => {
       if (!nextLocal[date]) nextLocal[date] = {};
       Object.keys(remote[date]).forEach(mId => {
         remoteMembersSet.add(mId); // Track member ID
+        
+        // Track global deletion status
+        if (remote[date][mId]['sync_member_delete'] !== undefined) {
+          const isDeleted = remote[date][mId]['sync_member_delete'];
+          if (!memberDeleteStatus[mId] || date >= memberDeleteStatus[mId].date) {
+             memberDeleteStatus[mId] = { date, deleted: isDeleted };
+          }
+        }
+
         if (!nextLocal[date][mId]) nextLocal[date][mId] = {};
         Object.keys(remote[date][mId]).forEach(tId => {
           const interactionKey = `${date}|${mId}|${tId}`;
@@ -158,10 +200,30 @@ const App: React.FC = () => {
       setMembers(prevMembers => {
         let membersChanged = false;
         const newMembers = [...prevMembers];
+        const localDeleted = getDeletedMembers();
+        
         remoteMembersSet.forEach(mId => {
-          if (!newMembers.some(m => m.id === mId)) {
+          const isGloballyDeleted = memberDeleteStatus[mId]?.deleted === true;
+          const isLocallyDeleted = localDeleted.includes(mId);
+          
+          if (isGloballyDeleted && !isLocallyDeleted) {
+            saveDeletedMembers([...localDeleted, mId]);
+            localDeleted.push(mId);
+          }
+
+          // If member is not in our list, and not deleted globally or locally, add them
+          if (!newMembers.some(m => m.id === mId) && !isGloballyDeleted && !isLocallyDeleted) {
             newMembers.push({ id: mId, name: mId, avatar: '👤' });
             membersChanged = true;
+          }
+          
+          // If member is in our list but marked as deleted globally, remove them
+          if (newMembers.some(m => m.id === mId) && isGloballyDeleted) {
+             const index = newMembers.findIndex(m => m.id === mId);
+             if (index !== -1) {
+               newMembers.splice(index, 1);
+               membersChanged = true;
+             }
           }
         });
         if (membersChanged) {
